@@ -51,7 +51,7 @@ jobs:
       - name: Enable the Cloud Billing API
         if: steps.secret.outputs.ok == 'true'
         run: |
-          PROJECT=$(node -p 'require("./.firebaserc").projects.default')
+          PROJECT=$(node -p 'JSON.parse(require("fs").readFileSync(".firebaserc", "utf8")).projects.default')
           # the error goes into an annotation, so it is visible without opening the log
           OUT=$(gcloud services enable cloudbilling.googleapis.com --project "$PROJECT" 2>&1) || { echo "::error::$(echo "$OUT" | tr '\n' ' ')"; exit 1; }
           echo "$OUT"
