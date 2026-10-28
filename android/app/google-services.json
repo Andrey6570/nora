@@ -14,6 +14,14 @@
       },
       "oauth_client": [
         {
+          "client_id": "1001715918922-gd0pavfbbv1v6si67vm2hr1eq6t64rpv.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.andrey6570.nora",
+            "certificate_hash": "a5674b11c8096a92b003cbaafc6cdd344eb473bf"
+          }
+        },
+        {
           "client_id": "1001715918922-smiaqksv79qakf7dmr61013pe0d1l60n.apps.googleusercontent.com",
           "client_type": 3
         }
