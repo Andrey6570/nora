@@ -60,13 +60,13 @@ jobs:
         if: steps.secret.outputs.ok == 'true'
         run: |
           deploy() { npx firebase deploy --only functions,firestore:rules --non-interactive --force 2>&1 | tee deploy.log; return ${PIPESTATUS[0]}; }
-          deploy; CODE=$?
+          deploy && CODE=0 || CODE=$?
           # a failed first deploy can leave a function without its trigger, which Firebase then refuses to update:
           # delete such functions and deploy once more
           BROKEN=$(grep -oE '\[[A-Za-z0-9]+\([a-z0-9-]+\)\] Changing from an HTTPS function' deploy.log | sed -E 's/^\[([A-Za-z0-9]+)\(([a-z0-9-]+)\).*/\1 \2/' | sort -u)
           if [ "$CODE" != 0 ] && [ -n "$BROKEN" ]; then
             echo "$BROKEN" | while read -r NAME REGION; do npx firebase functions:delete "$NAME" --region "$REGION" --force; done
-            deploy; CODE=$?
+            deploy && CODE=0 || CODE=$?
           fi
           # error lines go into an annotation, so they are visible without opening the log
           if [ "$CODE" != 0 ]; then echo "::error::$(grep -iE 'error|fail|denied|permission' deploy.log | tail -8 | tr '\n' ' ')"; exit "$CODE"; fi
