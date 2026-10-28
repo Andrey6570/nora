@@ -58,4 +58,7 @@ jobs:
 
       - name: Deploy
         if: steps.secret.outputs.ok == 'true'
-        run: npx firebase deploy --only functions,firestore:rules --non-interactive --force
+        run: |
+          # error lines go into an annotation, so they are visible without opening the log
+          npx firebase deploy --only functions,firestore:rules --non-interactive --force 2>&1 | tee deploy.log; CODE=${PIPESTATUS[0]}
+          if [ "$CODE" != 0 ]; then echo "::error::$(grep -iE 'error|fail|denied|permission' deploy.log | tail -8 | tr '\n' ' ')"; exit "$CODE"; fi
