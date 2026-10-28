@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated } from "../handlers.js";
+import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated, onAnswerCreated } from "../handlers.js";
+import * as G from "../gamedata.js";
+const { wishLevel } = G;
 import { GAMES, gameName } from "../games.js";
 import { MESSAGES, REACTIONS, pushText } from "../signals.js";
 import { baseStars, stageStars, weekKey, periodKey, logId, parseLogId } from "../economy.js";
@@ -37,7 +39,7 @@ function fakeDb(seed) {
     docs,
     doc: ref,
     collection,
-    runTransaction: async fn => fn({ get: r => r.get(), update: (r, p) => apply(r.path, p), delete: r => docs.delete(r.path) }),
+    runTransaction: async fn => fn({ get: r => r.get(), update: (r, p) => apply(r.path, p), set: (r, d) => { docs.set(r.path, structuredClone(d)); }, delete: r => docs.delete(r.path) }),
     recursiveDelete: async r => { for (const k of [...docs.keys()]) if (k === r.path || k.startsWith(r.path + "/")) docs.delete(k); }
   };
 }
@@ -243,4 +245,59 @@ test("bad orders are removed: outsider, unknown reward, empty pot, no partner", 
   assert.equal((await run({ "pairs/p": { ...shopPair, members: ["a"] } }, "o4", order("reward", "dinner"))).res, "no-partner");
   const { db } = await run({}, "o5", order("reward", "nope"));
   assert.equal(db.docs.has("pairs/p/orders/o5"), false);
+});
+
+// ---- games for two ----
+test("game content: every text has three languages and the sizes are sane", () => {
+  const triple = t => Array.isArray(t) && t.length === 3 && t.every(x => typeof x === "string" && x.length > 2 && x.length < 220);
+  const all = [...G.WHEEL, ...Object.values(G.DECKS).flat(), ...G.WISHES, ...G.COUPONS, ...G.DAYS30,
+    ...G.GUESS.flatMap(g => [g.q, ...g.o]), ...G.SCRIPTS.flatMap(s => [s.title, ...s.steps])];
+  assert.deepEqual(all.filter(t => !triple(t)), []);
+  assert.equal(G.DAYS30.length, 30);
+  assert.equal(G.DECKS.questions36.length, 36);
+  assert.ok(G.GUESS.every(g => g.o.length >= 3 && g.o.length <= 4));
+  assert.ok(G.WISHES.length < 100 && G.GUESS.length < 100);
+  assert.deepEqual(Object.keys(GAMES).sort(), ["coupons", "dreams", "flirt", "guess", "homeDate", "intimacy30", "memories", "questions36", "truth", "wheel", "wishes"]);
+});
+
+const gp = { ...sigPair, games: { wishes: true } };
+const ans = (game, item, uid, rest) => ({ uid, game, item: String(item), at: 1, ...rest });
+const idOf = a => `${a.game}_${a.item}_${a.uid}`;
+async function answer(seed, a) {
+  const db = fakeDb({ "pairs/p": gp, ...seed, [`pairs/p/answers/${idOf(a)}`]: a });
+  return { db, res: await onAnswerCreated({ db, now }, { pid: "p", id: idOf(a), data: a }) };
+}
+
+test("guess: the first answer waits, the second reveals both answers and guesses", async () => {
+  const a = ans("guess", 2, "a", { v: 1, g: 3 }), b = ans("guess", 2, "b", { v: 3, g: 1 });
+  assert.equal((await answer({}, a)).res, "waiting");
+  const { db, res } = await answer({ [`pairs/p/answers/${idOf(a)}`]: a }, b);
+  assert.equal(res, "revealed");
+  assert.deepEqual(db.docs.get("pairs/p/results/guess_2").answers, { b: { v: 3, g: 1 }, a: { v: 1, g: 3 } });
+});
+
+test("wishes: only matches are revealed and a no is never shown", async () => {
+  assert.deepEqual([["yes", "yes"], ["yes", "maybe"], ["maybe", "maybe"], ["yes", "no"], ["no", "maybe"], ["no", "no"]].map(([x, y]) => wishLevel(x, y)), ["yes", "maybe", "maybe", null, null, null]);
+  const a = ans("wishes", 4, "a", { v: "yes" });
+  const hit = await answer({ [`pairs/p/answers/${idOf(a)}`]: a }, ans("wishes", 4, "b", { v: "maybe" }));
+  assert.equal(hit.res, "match");
+  assert.deepEqual(hit.db.docs.get("pairs/p/results/wishes_4"), { game: "wishes", item: "4", level: "maybe", at: now().getTime() });
+  const miss = await answer({ [`pairs/p/answers/${idOf(a)}`]: a }, ans("wishes", 4, "b", { v: "no" }));
+  assert.equal(miss.res, "no-match");
+  assert.equal(miss.db.docs.has("pairs/p/results/wishes_4"), false);
+});
+
+test("bad answers are removed: unknown game, out of range, locked game, wrong id, outsider, odd shape", async () => {
+  const cases = [["unknown game", ans("chess", 1, "a", { v: 1 }), gp], ["item out of range", ans("guess", 99, "a", { v: 1, g: 1 }), gp],
+    ["option out of range", ans("guess", 0, "a", { v: 9, g: 1 }), gp], ["wish locked", ans("wishes", 1, "a", { v: "yes" }), sigPair],
+    ["bad wish value", ans("wishes", 1, "a", { v: "love" }), gp], ["outsider", ans("guess", 1, "x", { v: 1, g: 1 }), gp],
+    ["guess without guess", ans("guess", 1, "a", { v: 1 }), gp]];
+  for (const [name, a, pair] of cases) {
+    const db = fakeDb({ "pairs/p": pair, [`pairs/p/answers/${idOf(a)}`]: a });
+    const res = await onAnswerCreated({ db, now }, { pid: "p", id: idOf(a), data: a });
+    assert.equal(res, "bad-answer", name);
+    assert.equal(db.docs.has(`pairs/p/answers/${idOf(a)}`), false, name);
+  }
+  const a = ans("guess", 1, "a", { v: 1, g: 1 }), db = fakeDb({ "pairs/p": gp, "pairs/p/answers/wrong": a });
+  assert.equal(await onAnswerCreated({ db, now }, { pid: "p", id: "wrong", data: a }), "bad-answer");
 });

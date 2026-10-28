@@ -3,7 +3,8 @@
 import { FieldValue } from "firebase-admin/firestore";
 import { stageStars, togetherStars, parseLogId, periodKey } from "./economy.js";
 import { isKnown, pushText, shopText, LIMITS } from "./signals.js";
-import { GAMES, isPaidGame, gameName } from "./games.js";
+import { GAMES, isPaidGame, gameName, isUnlocked } from "./games.js";
+import { GUESS_OPTIONS, WISHES, WISH_ANSWERS, wishLevel } from "./gamedata.js";
 
 const inc = n => FieldValue.increment(n);
 
@@ -58,6 +59,43 @@ export async function onSignalCreated(deps, { pid, id, data }) {
   if (parsed) { const t = await db.doc(`pairs/${pid}/tasks/${parsed.taskId}`).get(); taskTitle = t.exists ? t.data().title : ""; }
   await pushTo(deps, pid, res.partner, res.name || "Nora", lang => pushText(data.kind, data.key, lang, taskTitle));
   return "sent";
+}
+
+// ---- answers to the games where both partners answer in private ----
+// An answer is stored under pairs/{pid}/answers/{game}_{item}_{uid} and can be read only by its author. When the partner's
+// answer is there too, the server writes pairs/{pid}/results/{game}_{item}, which both can read:
+//   guess  -> both answers and guesses
+//   wishes -> only a match ("yes" when both said yes, "maybe" when both are at least open); a "no" is never revealed
+const isIndex = (n, size) => Number.isInteger(n) && n >= 0 && n < size;
+function validAnswer(data) {
+  const item = Number(data.item);
+  if (!/^\d{1,2}$/.test(String(data.item))) return false;
+  if (data.game === "guess") return isIndex(item, GUESS_OPTIONS.length) && isIndex(data.v, GUESS_OPTIONS[item]) && isIndex(data.g, GUESS_OPTIONS[item]);
+  if (data.game === "wishes") return isIndex(item, WISHES.length) && WISH_ANSWERS.includes(data.v) && data.g === undefined;
+  return false;
+}
+export async function onAnswerCreated({ db, now = () => new Date() }, { pid, id, data }) {
+  const ref = db.doc(`pairs/${pid}/answers/${id}`), pairRef = db.doc(`pairs/${pid}`);
+  return db.runTransaction(async tx => {
+    const pair = await tx.get(pairRef);
+    const p = pair.exists ? pair.data() : null;
+    const reject = reason => { tx.delete(ref); return reason; };
+    if (!p || !data || !(p.members || []).includes(data.uid) || id !== `${data.game}_${data.item}_${data.uid}`) return reject("bad-answer");
+    if (!isUnlocked(p, data.game) || !validAnswer(data)) return reject("bad-answer");
+    const partner = (p.members || []).find(u => u !== data.uid);
+    if (!partner) return "waiting";
+    const other = await tx.get(db.doc(`pairs/${pid}/answers/${data.game}_${data.item}_${partner}`));
+    if (!other.exists) return "waiting";
+    const o = other.data(), resRef = db.doc(`pairs/${pid}/results/${data.game}_${data.item}`);
+    if (data.game === "guess") {
+      tx.set(resRef, { game: "guess", item: data.item, answers: { [data.uid]: { v: data.v, g: data.g }, [partner]: { v: o.v, g: o.g } }, at: now().getTime() });
+      return "revealed";
+    }
+    const level = wishLevel(data.v, o.v);
+    if (!level) return "no-match";
+    tx.set(resRef, { game: "wishes", item: data.item, level, at: now().getTime() });
+    return "match";
+  });
 }
 
 // ---- the shop: personal rewards from one's own stars, joint rewards and games from the pot with the partner's consent ----

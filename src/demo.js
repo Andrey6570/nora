@@ -3,12 +3,15 @@
 import { stageStars, togetherStars, parseLogId, DEFAULT_SCALE } from "../functions/economy.js";
 import { newInviteCode, dayKey, uid } from "./domain.js";
 import { isKnown, LIMITS } from "../functions/signals.js";
+import { wishLevel } from "../functions/gamedata.js";
+import { GAMES } from "../functions/games.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], error: "", demo: true };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, error: "", demo: true };
 let notify = () => {};
 const ME = "me", PARTNER = "partner";
 const sync = () => { M.logList = [...M.logs.values()]; notify(); };
 
+const PARTNER_ANSWERS = { guess: {}, wishes: {} };
 function seed(stage) {
   M.user = { uid: ME };
   if (stage === "signedout") { M.user = null; return; }
@@ -34,13 +37,21 @@ function seed(stage) {
   mark("t4_plan_once", PARTNER, today);
   mark("t5_notice_once", ME, today);
   M.pair.sigDay = { [ME]: { day: today, message: 1, reaction: 0 } };
-  M.pair.games = {};
+  M.pair.games = { wishes: true, coupons: true, dreams: true, intimacy30: true };
+  M.coupons = [{ id: "c1", from: PARTNER, title: "Массаж на 20 минут", at: now - 7200e3 }, { id: "c2", from: ME, title: "Завтрак в постель", at: now - 86400e3 }];
+  // the partner has already answered some items, so revealing can be tried
+  PARTNER_ANSWERS.guess = { 0: { v: 0, g: 1 }, 1: { v: 2, g: 0 }, 2: { v: 1, g: 1 } };
+  PARTNER_ANSWERS.wishes = { 0: "yes", 1: "maybe", 2: "no", 3: "yes", 4: "maybe", 5: "yes" };
+  M.results.set("guess_0", { id: "guess_0", game: "guess", item: "0", answers: { [ME]: { v: 1, g: 0 }, [PARTNER]: { v: 0, g: 1 } } });
+  M.answers.set("guess_0_" + ME, { id: "guess_0_" + ME, uid: ME, game: "guess", item: "0", v: 1, g: 0 });
+  M.answers.set("guess_1_" + ME, { id: "guess_1_" + ME, uid: ME, game: "guess", item: "1", v: 1, g: 2 });
   M.rewards = [
     { id: "r1", title: "Сплю до 10 утра", cost: 10, scope: "personal" }, { id: "r2", title: "Я выбираю фильм", cost: 5, scope: "personal" },
     { id: "r3", title: "Ужин вдвоём вне дома", cost: 40, scope: "joint" }, { id: "r4", title: "Кино вдвоём", cost: 20, scope: "joint" }
   ];
   M.orders = [
     { id: "o1", uid: PARTNER, kind: "reward", ref: "r4", status: "proposed", cost: 20, title: "Кино вдвоём", joint: true, at: now - 1800e3 },
+    { id: "o3", uid: PARTNER, kind: "game", ref: "flirt", status: "proposed", cost: 20, title: "flirt", joint: true, at: now - 900e3 },
     { id: "o2", uid: ME, kind: "reward", ref: "r2", status: "bought", cost: 5, title: "Я выбираю фильм", joint: false, at: now - 86400e3 }
   ];
   M.signals = [
@@ -113,6 +124,10 @@ export async function saveReward(r) {
 export async function deleteReward(id) { M.rewards = M.rewards.filter(r => r.id !== id); notify(); }
 export async function addRewards(list) { list.forEach(r => M.rewards.push({ id: uid(), title: r.title, cost: r.cost, scope: r.scope })); notify(); }
 export async function placeOrder(kind, ref) {
+  if (kind === "game") {
+    if ((M.pair.pot || 0) < GAMES[ref].cost) throw { code: "not-enough" };
+    M.orders.push({ id: uid(), uid: ME, kind, ref, at: Date.now(), cost: GAMES[ref].cost, title: ref, status: "proposed", joint: true }); notify(); return;
+  }
   const r = M.rewards.find(x => x.id === ref); if (!r) return;
   const o = { id: uid(), uid: ME, kind, ref, at: Date.now(), cost: r.cost, title: r.title };
   if (r.scope === "joint") {
@@ -127,10 +142,27 @@ export async function placeOrder(kind, ref) {
 export async function approveOrder(id) {
   const o = M.orders.find(x => x.id === id); if (!o || o.uid === ME) return;
   if ((M.pair.pot || 0) < o.cost) { M.orders = M.orders.filter(x => x.id !== id); notify(); throw { code: "not-enough" }; }
-  M.pair.pot -= o.cost; o.status = "bought"; notify();
+  M.pair.pot -= o.cost; o.status = "bought";
+  if (o.kind === "game") M.pair.games = Object.assign({}, M.pair.games, { [o.ref]: true });
+  notify();
 }
 export async function cancelOrder(id) { M.orders = M.orders.filter(o => o.id !== id); notify(); }
 export async function markUsed(id) { const o = M.orders.find(x => x.id === id); if (o) o.used = true; notify(); }
+// Games: the same reveal rules as the server (guess shows both, wishes only a match).
+export async function sendAnswer(game, item, values) {
+  const id = `${game}_${item}_${ME}`;
+  M.answers.set(id, Object.assign({ id, uid: ME, game, item: String(item) }, values));
+  const other = PARTNER_ANSWERS[game] && PARTNER_ANSWERS[game][item];
+  if (other !== undefined) {
+    if (game === "guess") M.results.set(`guess_${item}`, { id: `guess_${item}`, game, item: String(item), answers: { [ME]: { v: values.v, g: values.g }, [PARTNER]: other } });
+    else { const level = wishLevel(values.v, other); if (level) M.results.set(`wishes_${item}`, { id: `wishes_${item}`, game, item: String(item), level }); }
+  }
+  notify();
+}
+export async function addCoupon(title) { M.coupons.unshift({ id: uid(), from: ME, title: title.trim(), at: Date.now() }); notify(); }
+export async function useCoupon(id) { const c = M.coupons.find(x => x.id === id); if (c) c.used = true; notify(); }
+export async function deleteCoupon(id) { M.coupons = M.coupons.filter(c => c.id !== id); notify(); }
+export async function saveProgress(p) { M.progress = { start: p.start, done: p.done }; notify(); }
 export async function registerDevice() { return false; }
 export async function setDeviceLang() {}
 export async function claim(view, stage, together) {

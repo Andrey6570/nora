@@ -7,7 +7,7 @@ import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
 import { newInviteCode, normCode, dayKey, logCutoff, uid as newId } from "./domain.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], error: "" };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, error: "" };
 
 let notify = () => {};
 let unsubs = [];
@@ -20,7 +20,7 @@ const userRef = () => doc(db, "users", me());
 
 function stopPair() {
   unsubs.forEach(f => f()); unsubs = [];
-  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = []; M.signals = []; M.rewards = []; M.orders = [];
+  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = []; M.signals = []; M.rewards = []; M.orders = []; M.answers = new Map(); M.results = new Map(); M.coupons = []; M.progress = null;
   RECENT.clear(); ONCE.clear();
 }
 function rebuildLogs() {
@@ -46,6 +46,11 @@ function watchPair(pid) {
     RECENT.clear(); rows(s).forEach(r => RECENT.set(r.id, r)); rebuildLogs();
   }, onErr));
   unsubs.push(onSnapshot(collection(db, ...base, "rewards"), s => { M.rewards = rows(s); notify(); }, onErr));
+  // own private answers only (the rules allow nothing else), and the results the server revealed
+  unsubs.push(onSnapshot(query(collection(db, ...base, "answers"), where("uid", "==", me())), s => { M.answers = new Map(rows(s).map(r => [r.id, r])); notify(); }, onErr));
+  unsubs.push(onSnapshot(collection(db, ...base, "results"), s => { M.results = new Map(rows(s).map(r => [r.id, r])); notify(); }, onErr));
+  unsubs.push(onSnapshot(collection(db, ...base, "coupons"), s => { M.coupons = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify(); }, onErr));
+  unsubs.push(onSnapshot(doc(db, ...base, "progress", "intimacy30"), s => { M.progress = s.exists() ? s.data() : null; notify(); }, () => {}));
   unsubs.push(onSnapshot(collection(db, ...base, "orders"), s => { M.orders = rows(s); notify(); }, onErr));
   unsubs.push(onSnapshot(query(collection(db, ...base, "signals"), where("day", ">=", logCutoff(dayKey()))), s => {
     M.signals = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify();
@@ -91,6 +96,15 @@ export const placeOrder = (kind, ref) => addDoc(collection(db, "pairs", M.pair.i
 export const approveOrder = id => updateDoc(doc(db, "pairs", M.pair.id, "orders", id), { approvedBy: me() });
 export const cancelOrder = id => deleteDoc(doc(db, "pairs", M.pair.id, "orders", id));
 export const markUsed = id => updateDoc(doc(db, "pairs", M.pair.id, "orders", id), { used: true });
+
+// ---- games ----
+// A private answer; the server reveals it to the partner only together with theirs (or, for wishes, only as a match).
+export const sendAnswer = (game, item, values) => setDoc(doc(db, "pairs", M.pair.id, "answers", `${game}_${item}_${me()}`),
+  Object.assign({ uid: me(), game, item: String(item), at: Date.now() }, values));
+export const addCoupon = title => addDoc(collection(db, "pairs", M.pair.id, "coupons"), { from: me(), title: title.trim().slice(0, 80), at: Date.now() });
+export const useCoupon = id => updateDoc(doc(db, "pairs", M.pair.id, "coupons", id), { used: true });
+export const deleteCoupon = id => deleteDoc(doc(db, "pairs", M.pair.id, "coupons", id));
+export const saveProgress = p => setDoc(doc(db, "pairs", M.pair.id, "progress", "intimacy30"), { start: p.start, done: p.done });
 
 // ---- push: this phone's token, so the partner's reactions and signals reach it ----
 let token = "", deviceLang = "ru", onPushMessage = () => {};

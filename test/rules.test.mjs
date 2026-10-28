@@ -157,6 +157,70 @@ test("orders: asked by the buyer, priced by the server, agreed by the partner", 
   await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "games.wishes": true }));
 });
 
+test("answers: private to the author, immutable, gated by the unlocked game; results only from the server", async () => {
+  await seed(async db => {
+    await setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"], { games: { wishes: true } }));
+    await setDoc(doc(db, "pairs/q"), pairDoc(["a", "b"]));
+    await setDoc(doc(db, "pairs/p/results/guess_1"), { game: "guess", item: "1", answers: {}, at: 1 });
+  });
+  const g = { uid: "a", game: "guess", item: "1", v: 1, g: 2, at: 1 };
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/answers/guess_1_a"), g));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/answers/guess_1_a"), { ...g, v: 0 }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/answers/guess_1_a"), { v: 0 }));
+  await assertFails(deleteDoc(doc(as("a"), "pairs/p/answers/guess_1_a")));
+  await assertSucceeds(getDoc(doc(as("a"), "pairs/p/answers/guess_1_a")));
+  await assertFails(getDoc(doc(as("b"), "pairs/p/answers/guess_1_a")));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/answers/guess_1_a"), { ...g, uid: "b" }));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/answers/guess_2_a"), { ...g, uid: "b", item: "2" }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/answers/guess_1_a2"), { ...g, extra: 1 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/answers/chess_1_a"), { ...g, game: "chess" }));
+  await assertFails(setDoc(doc(as("x"), "pairs/p/answers/guess_3_x"), { ...g, uid: "x", item: "3" }));
+  // a wish needs the bought game
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/answers/wishes_3_a"), { uid: "a", game: "wishes", item: "3", v: "yes", at: 1 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/q/answers/wishes_3_a"), { uid: "a", game: "wishes", item: "3", v: "yes", at: 1 }));
+  // results can be read by both, written by nobody
+  await assertSucceeds(getDoc(doc(as("b"), "pairs/p/results/guess_1")));
+  await assertFails(getDoc(doc(as("x"), "pairs/p/results/guess_1")));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/results/wishes_3"), { game: "wishes", item: "3", level: "yes", at: 1 }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/results/guess_1"), { at: 2 }));
+});
+
+test("coupons: need the bought game; the author gives and withdraws, the partner marks them used", async () => {
+  await seed(async db => {
+    await setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"], { games: { coupons: true } }));
+    await setDoc(doc(db, "pairs/q"), pairDoc(["a", "b"]));
+    await setDoc(doc(db, "pairs/p/coupons/c1"), { from: "a", title: "Массаж", at: 1 });
+    await setDoc(doc(db, "pairs/p/coupons/c2"), { from: "a", title: "Завтрак", at: 1, used: true });
+  });
+  const c = { from: "a", title: "Танец", at: 1 };
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/coupons/n1"), c));
+  await assertFails(setDoc(doc(as("a"), "pairs/q/coupons/n1"), c));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/coupons/n2"), c));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/coupons/n3"), { ...c, used: true }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/coupons/c1"), { used: true }));
+  await assertFails(updateDoc(doc(as("b"), "pairs/p/coupons/c1"), { title: "Другое" }));
+  await assertSucceeds(updateDoc(doc(as("b"), "pairs/p/coupons/c1"), { used: true }));
+  await assertFails(updateDoc(doc(as("b"), "pairs/p/coupons/c2"), { used: true }));
+  await assertFails(deleteDoc(doc(as("a"), "pairs/p/coupons/c2")));
+  await assertFails(deleteDoc(doc(as("b"), "pairs/p/coupons/n1")));
+  await assertSucceeds(deleteDoc(doc(as("a"), "pairs/p/coupons/n1")));
+});
+
+test("progress of 30 days: members of a pair that bought it, valid shape", async () => {
+  await seed(async db => {
+    await setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"], { games: { intimacy30: true } }));
+    await setDoc(doc(db, "pairs/q"), pairDoc(["a", "b"]));
+  });
+  const pr = { start: "2026-10-28", done: [1, 2] };
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/progress/intimacy30"), pr));
+  await assertSucceeds(updateDoc(doc(as("b"), "pairs/p/progress/intimacy30"), { done: [1, 2, 3] }));
+  await assertFails(setDoc(doc(as("a"), "pairs/q/progress/intimacy30"), pr));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/progress/other"), pr));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/progress/intimacy30"), { ...pr, extra: 1 }));
+  await assertFails(setDoc(doc(as("x"), "pairs/p/progress/intimacy30"), pr));
+  await assertFails(deleteDoc(doc(as("a"), "pairs/p/progress/intimacy30")));
+});
+
 test("a profile is private", async () => {
   await assertSucceeds(setDoc(doc(as("a"), "users/a"), { pairId: "p", lang: "el" }));
   await assertFails(getDoc(doc(as("b"), "users/a")));

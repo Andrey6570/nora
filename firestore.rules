@@ -12,6 +12,8 @@ service cloud.firestore {
       return !('names' in changed())
         || request.resource.data.names.diff(resource.data.names).affectedKeys().hasOnly([me()]);
     }
+    // a game the pair has bought (free games are never listed in pair.games)
+    function unlocked(pid, g) { return get(pairPath(pid)).data.get('games', {}).get(g, false) == true; }
     function validName(n) { return n is string && n.size() > 0 && n.size() <= 40; }
 
     // own profile: language, display name, current pair
@@ -71,6 +73,46 @@ service cloud.firestore {
           && request.resource.data.difficulty in [1, 2, 3]
           && request.resource.data.repeat in ['once', 'daily', 'weekly']
           && request.resource.data.full is bool;
+      }
+
+      // private answers of the games for two: only the author reads them, the server reveals matches in results
+      match /answers/{id} {
+        allow read: if isMember(pid) && resource.data.uid == me();
+        allow create: if isMember(pid)
+          && request.resource.data.uid == me()
+          && request.resource.data.keys().hasOnly(['uid', 'game', 'item', 'v', 'g', 'at'])
+          && request.resource.data.game in ['guess', 'wishes']
+          && request.resource.data.item is string && request.resource.data.item.size() <= 2
+          && id == request.resource.data.game + '_' + request.resource.data.item + '_' + me()
+          && (request.resource.data.game == 'guess' || unlocked(pid, request.resource.data.game));
+        allow update, delete: if false;
+      }
+      match /results/{id} {
+        allow read: if isMember(pid);
+        allow write: if false;
+      }
+
+      // gift coupons: the author gives, the partner marks one as used
+      match /coupons/{id} {
+        allow read: if isMember(pid);
+        allow create: if isMember(pid) && unlocked(pid, 'coupons')
+          && request.resource.data.from == me()
+          && request.resource.data.keys().hasOnly(['from', 'title', 'at'])
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80;
+        allow update: if isMember(pid) && resource.data.from != me() && !('used' in resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used'])
+          && request.resource.data.used == true;
+        allow delete: if isMember(pid) && resource.data.from == me() && !('used' in resource.data);
+      }
+
+      // progress of the 30 days of closeness
+      match /progress/{game} {
+        allow read: if isMember(pid);
+        allow create, update: if isMember(pid) && game == 'intimacy30' && unlocked(pid, game)
+          && request.resource.data.keys().hasOnly(['start', 'done'])
+          && request.resource.data.start is string && request.resource.data.start.size() == 10
+          && request.resource.data.done is list && request.resource.data.done.size() <= 30;
+        allow delete: if false;
       }
 
       // rewards the pair chose: scope "personal" is bought from one's own stars, "joint" from the pot together

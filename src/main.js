@@ -3,6 +3,8 @@ import { t, getLang, setLang } from "./i18n.js";
 import * as V from "./views.js";
 import { configured } from "./fb.js";
 import { taskView, dayKey, PACKS, packTask, REWARD_PACKS, rewardRow } from "./domain.js";
+import { initialGame, shuffle, deckKey, dayNumber } from "./gameviews.js";
+import { WHEEL, COUPONS, DECKS, pick } from "../functions/gamedata.js";
 
 const demo = new URLSearchParams(location.search).has("demo");
 const store = demo ? await import("./demo.js") : configured ? await import("./store.js") : null;
@@ -14,7 +16,7 @@ const THEME_KEY = "nora-theme", SEEN_KEY = "nora-seen-signals";
 const NEW_REWARD = () => ({ title: "", cost: 20, scope: "personal" });
 const NEW_TASK = () => ({ title: "", minutes: 15, difficulty: 1, repeat: "once", full: true });
 
-const ui = { seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
+const ui = { game: null, seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
 
 // ---------- messages ----------
 function errText(e) {
@@ -77,6 +79,7 @@ function render() {
 // ---------- input ----------
 function setField(name, value) {
   if (name.startsWith("d.")) { ui.sheet.draft[name.slice(2)] = value; return; }
+  if (name.startsWith("g.")) { ui.game[name.slice(2)] = value; render(); return; }
   ui[name] = value;
 }
 document.addEventListener("input", e => {
@@ -91,6 +94,10 @@ const findView = id => {
   const task = S.tasks.find(x => x.id === id);
   return task && taskView(task, S.logs, S.pair.scale, dayKey());
 };
+
+let wheelTimer = null;
+const stopWheel = () => { if (wheelTimer) { clearInterval(wheelTimer); wheelTimer = null; } };
+function saveDeck() { LS.set(deckKey(ui.game.id), String(ui.game.idx)); }
 
 const actions = {
   demo: () => { location.search = "?demo"; },
@@ -147,6 +154,47 @@ const actions = {
   }, "Сохранено"),
   "delete-task": el => run(async () => { await store.deleteTask(el.dataset.id); ui.sheet = null; }, "Дело удалено"),
   packs: () => { ui.err = ""; ui.sheet = { type: "packs", picked: new Set() }; render(); },
+  // ---- games ----
+  "game-open": el => { ui.err = ""; ui.game = initialGame(el.dataset.id); render(); window.scrollTo(0, 0); },
+  "game-back": () => { stopWheel(); ui.game = null; ui.err = ""; render(); },
+  "buy-game": el => { ui.err = ""; ui.sheet = { type: "buygame", id: el.dataset.id }; render(); },
+  "buy-game-yes": el => run(async () => { await store.placeOrder("game", el.dataset.id); ui.sheet = null; }, "Предложено партнёру"),
+  "wheel-spin": () => {
+    const g = ui.game; if (g.spinning) return;
+    g.spinning = true; let n = 0; const final = Math.floor(Math.random() * WHEEL.length);
+    wheelTimer = setInterval(() => {
+      n++; g.cur = n > 14 ? final : Math.floor(Math.random() * WHEEL.length);
+      if (n > 14) { stopWheel(); g.spinning = false; }
+      render();
+    }, 100);
+    render();
+  },
+  "deck-next": () => { ui.game.idx++; saveDeck(); render(); },
+  "deck-prev": () => { ui.game.idx = Math.max(0, ui.game.idx - 1); saveDeck(); render(); },
+  "deck-restart": () => { ui.game.idx = 0; if (ui.game.id !== "questions36") ui.game.order = shuffle(DECKS[ui.game.id].length); saveDeck(); render(); },
+  "guess-open": el => { ui.game.open = Number(el.dataset.id); ui.game.step = 0; ui.game.v = null; ui.err = ""; render(); },
+  "guess-close": () => { ui.game.open = null; render(); },
+  "guess-pick": el => {
+    const g = ui.game, k = Number(el.dataset.k);
+    if (g.step === 0) { g.v = k; g.step = 1; render(); return; }
+    const item = g.open, v = g.v; g.step = 0; g.v = null;
+    run(() => store.sendAnswer("guess", item, { v, g: k }), "Ответ принят");
+  },
+  wish: el => run(() => store.sendAnswer("wishes", Number(el.dataset.id), { v: el.dataset.v }), "Ответ записан"),
+  "coupon-adding": el => { ui.game.adding = el.dataset.v === "1"; render(); },
+  "coupon-give": el => run(async () => { await store.addCoupon(pick(COUPONS[Number(el.dataset.id)], getLang())); ui.game.adding = false; }, "Купон подарен"),
+  "coupon-give-custom": () => run(async () => { await store.addCoupon(ui.game.text); ui.game.text = ""; ui.game.adding = false; }, "Купон подарен"),
+  "coupon-use": el => run(() => store.useCoupon(el.dataset.id), "Отмечено"),
+  "coupon-del": el => run(() => store.deleteCoupon(el.dataset.id)),
+  "script-open": el => { ui.game.script = Number(el.dataset.id); ui.game.done = new Set(); render(); },
+  "script-step": el => { const d = ui.game.done, i = Number(el.dataset.id); d.has(i) ? d.delete(i) : d.add(i); render(); },
+  "script-close": () => { ui.game.script = null; render(); },
+  "days-start": () => run(() => store.saveProgress({ start: dayKey(), done: [] })),
+  "days-done": el => run(() => {
+    const pr = S.progress, n = Number(el.dataset.id);
+    if (!pr || n < 1 || n > Math.min(30, dayNumber(pr.start, dayKey()))) return;
+    return store.saveProgress({ start: pr.start, done: [...new Set([...(pr.done || []), n])].sort((a, b) => a - b) });
+  }, "Отмечено"),
   "new-reward": () => { ui.err = ""; ui.sheet = { type: "reward", draft: NEW_REWARD() }; render(); },
   "edit-reward": el => { const r = S.rewards.find(x => x.id === el.dataset.id); if (r) { ui.err = ""; ui.sheet = { type: "reward", draft: Object.assign({}, r) }; render(); } },
   "save-reward": () => run(async () => {
@@ -208,7 +256,7 @@ document.addEventListener("click", e => {
   if (f) { e.preventDefault(); f(el); }
 });
 // the Android back button closes a sheet first
-document.addEventListener("keydown", e => { if (e.key === "Escape" && ui.sheet) actions.close(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape") { if (ui.sheet) actions.close(); else if (ui.game) actions["game-back"](); } });
 
 // ---------- start ----------
 setLang(getLang());
@@ -226,6 +274,6 @@ if (store) store.start(() => { render(); afterRender(); });
 render();
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   import("@capacitor/app").then(({ App }) => App.addListener("backButton", ({ canGoBack }) => {
-    if (ui.sheet) actions.close(); else if (ui.tab !== "tasks") { ui.tab = "tasks"; render(); } else App.exitApp();
+    if (ui.sheet) actions.close(); else if (ui.game) actions["game-back"](); else if (ui.tab !== "tasks") { ui.tab = "tasks"; render(); } else App.exitApp();
   })).catch(() => {});
 }

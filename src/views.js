@@ -1,13 +1,15 @@
 // Screens as HTML strings. Buttons carry data-act (and data-id) for the click handler in main.js.
 import { t, LANGS, getLang } from "./i18n.js";
 import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, SCOPES, REWARD_PACKS, taskGroups, weekStats, dayKey, signalsLeft, reactionsByRef, unseenSignals, shopView } from "./domain.js";
-import { gameName } from "../functions/games.js";
+import { GAMES } from "../functions/games.js";
+import { gamesTab, gameScreen, gameTitle } from "./gameviews.js";
 import { REACTIONS, MESSAGES, messageText } from "../functions/signals.js";
 import { stageStars } from "../functions/economy.js";
 import { LEGAL } from "./legal.js";
 import { HELP } from "./help.js";
 
-export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+import { esc } from "./util.js";
+export { esc };
 const star = n => `<span class="star">★</span>${n}`;
 const err = ui => ui.err ? `<p class="err" role="alert">${esc(ui.err)}</p>` : "";
 const seg = (name, items, cur) => `<div class="seg" role="radiogroup">${items.map(([v, label]) =>
@@ -133,7 +135,7 @@ function tasksTab(S) {
     ${empty ? "" : `<button class="fab" data-act="new-task" aria-label="${t("Добавить дело")}">＋</button>`}`;
 }
 
-const orderTitle = o => o.kind === "game" ? gameName(o.ref, getLang()) : o.title;
+const orderTitle = o => o.kind === "game" ? gameTitle(o.ref) : o.title;
 
 // Rewards: personal ones are bought from one's own stars at once, joint ones are proposed and spent from the pot when the partner agrees.
 function shopSection(S) {
@@ -249,10 +251,11 @@ function settingsTab(S, ui) {
     <p class="muted center-text small">${t("Нора")} 0.1</p>`;
 }
 
-const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "💌", "Тепло"], ["settings", "⚙️", "Настройки"]];
+const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "💌", "Тепло"], ["games", "🎲", "Игры"], ["settings", "⚙️", "Настройки"]];
 
 export function main(S, ui) {
-  const body = ui.tab === "us" ? usTab(S) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
+  if (ui.game) return gameScreen(S, ui) + (ui.sheet ? sheet(S, ui) : "");
+  const body = ui.tab === "us" ? usTab(S) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "games" ? ((S.pair.members || []).length < 2 ? invite(S.pair) : "") + gamesTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
   const unseen = ui.tab === "warm" ? 0 : unseenSignals(S.signals || [], S.user.uid, ui.seenAt || 0);
   return `<header class="top"><b>${t("Нора")}</b>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
     <main class="page">${body}${err(ui)}</main>
@@ -366,6 +369,7 @@ function sheet(S, ui) {
   if (k === "react") return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${reactSheet(S, ui)}</div>`;
   const buying = k === "buy" && (S.rewards || []).find(r => r.id === ui.sheet.id);
   const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet(S, ui)
+    : k === "buygame" ? confirmSheet("Открыть игру?", t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: gameTitle(ui.sheet.id), n: GAMES[ui.sheet.id].cost }), "buy-game-yes", "Предложить", ui.sheet.id, true)
     : k === "reward" ? rewardForm(S, ui) : k === "rewardpacks" ? rewardPacksSheet(S, ui)
     : k === "buy" ? (buying ? confirmSheet(buying.scope === "joint" ? "Предложить партнёру?" : "Купить награду?",
         buying.scope === "joint" ? t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: buying.title, n: buying.cost }) : t("«{x}» за {n} ★ из ваших звёзд. Они спишутся сразу.", { x: buying.title, n: buying.cost }),
