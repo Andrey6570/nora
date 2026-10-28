@@ -5,6 +5,7 @@ import { newInviteCode, dayKey, uid } from "./domain.js";
 import { isKnown, LIMITS } from "../functions/signals.js";
 import { wishLevel } from "../functions/gamedata.js";
 import { GAMES } from "../functions/games.js";
+import { DECOR } from "../functions/pet.js";
 
 export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, error: "", demo: true };
 let notify = () => {};
@@ -38,6 +39,9 @@ function seed(stage) {
   mark("t5_notice_once", ME, today);
   M.pair.sigDay = { [ME]: { day: today, message: 1, reaction: 0 } };
   M.pair.games = { wishes: true, coupons: true, dreams: true, intimacy30: true };
+  M.pair.pet = { kind: "fox", name: "Рыжик" }; M.pair.xp = 340;
+  M.pair.flame = { n: 5, last: dayKey(y), freezes: 1 }; M.pair.decor = { lamp: true, plant: true, rug: true };
+  M.pair.stats = { chores: 12, together: 3, signals: 8, reveals: 2, matches: 1, bought: 2 };
   M.coupons = [{ id: "c1", from: PARTNER, title: "Массаж на 20 минут", at: now - 7200e3 }, { id: "c2", from: ME, title: "Завтрак в постель", at: now - 86400e3 }];
   // the partner has already answered some items, so revealing can be tried
   PARTNER_ANSWERS.guess = { 0: { v: 0, g: 1 }, 1: { v: 2, g: 0 }, 2: { v: 1, g: 1 } };
@@ -51,6 +55,7 @@ function seed(stage) {
   ];
   M.orders = [
     { id: "o1", uid: PARTNER, kind: "reward", ref: "r4", status: "proposed", cost: 20, title: "Кино вдвоём", joint: true, at: now - 1800e3 },
+    { id: "o4", uid: PARTNER, kind: "decor", ref: "sofa", status: "proposed", cost: 20, title: "sofa", joint: true, at: now - 600e3 },
     { id: "o3", uid: PARTNER, kind: "game", ref: "flirt", status: "proposed", cost: 20, title: "flirt", joint: true, at: now - 900e3 },
     { id: "o2", uid: ME, kind: "reward", ref: "r2", status: "bought", cost: 5, title: "Я выбираю фильм", joint: false, at: now - 86400e3 }
   ];
@@ -92,6 +97,7 @@ export async function joinPair(code, name) {
 export async function newInvite() { M.pair.inviteCode = newInviteCode(); notify(); }
 export async function deleteAccount() { M.user = null; M.profile = null; M.pair = null; M.tasks = []; M.logs = new Map(); sync(); }
 export async function leavePair() { M.pair = null; M.tasks = []; M.logs = new Map(); M.profile.pairId = null; sync(); }
+export async function savePet(pet) { M.pair.pet = pet; notify(); }
 export async function saveName(name) { M.pair.names[ME] = name; M.profile.name = name; notify(); }
 export async function saveScale(n) { M.pair.scale = n; notify(); }
 export async function saveTask(t) {
@@ -124,9 +130,10 @@ export async function saveReward(r) {
 export async function deleteReward(id) { M.rewards = M.rewards.filter(r => r.id !== id); notify(); }
 export async function addRewards(list) { list.forEach(r => M.rewards.push({ id: uid(), title: r.title, cost: r.cost, scope: r.scope })); notify(); }
 export async function placeOrder(kind, ref) {
-  if (kind === "game") {
-    if ((M.pair.pot || 0) < GAMES[ref].cost) throw { code: "not-enough" };
-    M.orders.push({ id: uid(), uid: ME, kind, ref, at: Date.now(), cost: GAMES[ref].cost, title: ref, status: "proposed", joint: true }); notify(); return;
+  if (kind === "game" || kind === "decor") {
+    const cost = kind === "game" ? GAMES[ref].cost : DECOR[ref].cost;
+    if ((M.pair.pot || 0) < cost) throw { code: "not-enough" };
+    M.orders.push({ id: uid(), uid: ME, kind, ref, at: Date.now(), cost, title: ref, status: "proposed", joint: true }); notify(); return;
   }
   const r = M.rewards.find(x => x.id === ref); if (!r) return;
   const o = { id: uid(), uid: ME, kind, ref, at: Date.now(), cost: r.cost, title: r.title };
@@ -144,6 +151,7 @@ export async function approveOrder(id) {
   if ((M.pair.pot || 0) < o.cost) { M.orders = M.orders.filter(x => x.id !== id); notify(); throw { code: "not-enough" }; }
   M.pair.pot -= o.cost; o.status = "bought";
   if (o.kind === "game") M.pair.games = Object.assign({}, M.pair.games, { [o.ref]: true });
+  if (o.kind === "decor") M.pair.decor = Object.assign({}, M.pair.decor, { [o.ref]: true });
   notify();
 }
 export async function cancelOrder(id) { M.orders = M.orders.filter(o => o.id !== id); notify(); }

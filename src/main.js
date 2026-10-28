@@ -5,6 +5,8 @@ import { configured } from "./fb.js";
 import { taskView, dayKey, PACKS, packTask, REWARD_PACKS, rewardRow } from "./domain.js";
 import { initialGame, shuffle, deckKey, dayNumber } from "./gameviews.js";
 import { WHEEL, COUPONS, DECKS, pick } from "../functions/gamedata.js";
+import { DEFAULT_NAMES } from "./petdata.js";
+import { stageOf } from "../functions/pet.js";
 
 const demo = new URLSearchParams(location.search).has("demo");
 const store = demo ? await import("./demo.js") : configured ? await import("./store.js") : null;
@@ -78,6 +80,7 @@ function render() {
 
 // ---------- input ----------
 function setField(name, value) {
+  if (name.startsWith("petDraft.")) { ui.petDraft[name.slice(9)] = value; render(); return; }
   if (name.startsWith("d.")) { ui.sheet.draft[name.slice(2)] = value; return; }
   if (name.startsWith("g.")) { ui.game[name.slice(2)] = value; render(); return; }
   ui[name] = value;
@@ -130,6 +133,7 @@ const actions = {
     if (name === "theme") { ui.theme = v; LS.set(THEME_KEY, v); applyTheme(); render(); return; }
     if (name === "scale") { run(() => store.saveScale(Number(v)), "Сохранено"); return; }
     if (name === "help-tab") { ui.sheet.tab = v; render(); return; }
+    if (name === "burrow-tab") { ui.sheet.tab = v; render(); return; }
     setField(name, name === "d.repeat" || name === "d.scope" ? v : Number(v));
     render();
   },
@@ -154,6 +158,22 @@ const actions = {
   }, "Сохранено"),
   "delete-task": el => run(async () => { await store.deleteTask(el.dataset.id); ui.sheet = null; }, "Дело удалено"),
   packs: () => { ui.err = ""; ui.sheet = { type: "packs", picked: new Set() }; render(); },
+  // ---- the pet ----
+  "pet-kind": el => {
+    const k = el.dataset.id, d = ui.petDraft || (ui.petDraft = {});
+    const wasDefault = !d.name || Object.values(DEFAULT_NAMES).some(n => n.includes(d.name));
+    d.kind = k; if (wasDefault) d.name = pick(DEFAULT_NAMES[k], getLang()); render();
+  },
+  "pet-save": () => run(async () => { const d = ui.petDraft; if (!d || !d.name.trim()) throw { code: "need-name" }; await store.savePet({ kind: d.kind, name: d.name.trim().slice(0, 20) }); ui.petDraft = null; }, "Готово"),
+  "pet-edit": () => { ui.petDraft = Object.assign({}, S.pair.pet); S.pair.pet && (ui.editingPet = true); ui.sheet = { type: "petname" }; render(); },
+  "pet-name-save": () => run(async () => { const n = (ui.petDraft.name || "").trim(); if (!n) throw { code: "need-name" }; await store.savePet({ kind: S.pair.pet.kind, name: n.slice(0, 20) }); ui.sheet = null; ui.petDraft = null; }, "Сохранено"),
+  "pet-pat": () => {
+    ui.pats = (ui.pats || 0) + 1; ui.grew = null; ui.bounce = true; render();
+    setTimeout(() => { ui.bounce = false; render(); }, 650);
+  },
+  burrow: el => { ui.err = ""; ui.sheet = { type: "burrow", tab: el.dataset.v }; render(); },
+  "buy-decor": el => { ui.err = ""; ui.sheet = { type: "buydecor", id: el.dataset.id }; render(); },
+  "buy-decor-yes": el => run(async () => { await store.placeOrder("decor", el.dataset.id); ui.sheet = { type: "burrow", tab: "burrow" }; }, "Предложено партнёру"),
   // ---- games ----
   "game-open": el => { ui.err = ""; ui.game = initialGame(el.dataset.id); render(); window.scrollTo(0, 0); },
   "game-back": () => { stopWheel(); ui.game = null; ui.err = ""; render(); },
@@ -264,6 +284,12 @@ applyTheme();
 try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render()); } catch (e) {}
 let registered = false;
 function afterRender() {
+  // a new growth stage is announced once, by the pet
+  if (store && S.user && S.pair && S.pair.pet && ui.grew == null) {
+    const key = "nora-stage-" + S.pair.id, now = stageOf(S.pair.xp).index, was = LS.get(key);
+    if (was === null) LS.set(key, String(now));
+    else if (now > Number(was)) { LS.set(key, String(now)); ui.grew = now; render(); }
+  }
   // ask for the notification permission once, when the pair is open
   if (store && !registered && S.user && S.pair && !S.pair.loading) {
     registered = true;

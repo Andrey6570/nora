@@ -15,6 +15,7 @@ export const LEGAL = {
         <li><b>Учётная запись Google:</b> идентификатор, адрес почты и имя из профиля Google. Их хранит сервис входа Firebase Authentication.</li>
         <li><b>Имя в приложении,</b> которое вы указали сами.</li>
         <li><b>Данные пары:</b> код приглашения, дела (название, время, сложность, повтор), отметки этапов с датой и временем, звёзды и общая копилка.</li>
+        <li><b>Питомец пары:</b> его вид и имя, которые вы выбрали, купленные предметы норы и общие счётчики (опыт, «огонёк» пары, число общих дел, тёплых слов и игр), по которым питомец растёт и собирается альбом.</li>
         <li><b>Игры:</b> ваши ответы в играх «Угадай ответ» и «Карта желаний» (хранятся приватно, партнёр видит их только по правилам игры: оба ответа вместе или только совпадение), купоны, которые вы дарите, и прогресс «30 дней близости».</li>
         <li><b>Награды:</b> названия и цены наград, которые вы добавили, и ваши покупки с датой.</li>
         <li><b>Реакции и тёплые слова,</b> которые вы отправляете партнёру: какая именно, когда и к какому делу.</li>
@@ -50,6 +51,7 @@ export const LEGAL = {
         <li><b>Google account:</b> identifier, email address and name from your Google profile, stored by the Firebase Authentication sign-in service.</li>
         <li><b>Your name in the app,</b> which you enter yourself.</li>
         <li><b>Pair data:</b> invite code, chores (title, time, difficulty, repeat), stage marks with date and time, stars and the shared pot.</li>
+        <li><b>The pair's pet:</b> its kind and name that you choose, the burrow items you buy and shared counters (experience, the pair's “flame”, the number of joint chores, warm words and games) from which the pet grows and the album is filled.</li>
         <li><b>Games:</b> your answers in “Guess the answer” and “Wish map” (stored privately; your partner sees them only as the game's rules allow: both answers together, or only a match), coupons you give and the progress of “30 days of closeness”.</li>
         <li><b>Rewards:</b> titles and prices of the rewards you add, and your purchases with their date.</li>
         <li><b>Reactions and warm words</b> you send to your partner: which one, when and to which chore.</li>
@@ -85,6 +87,7 @@ export const LEGAL = {
         <li><b>Λογαριασμός Google:</b> αναγνωριστικό, διεύθυνση email και όνομα από το προφίλ Google, που αποθηκεύονται από την υπηρεσία σύνδεσης Firebase Authentication.</li>
         <li><b>Το όνομά σας στην εφαρμογή,</b> το οποίο εισάγετε εσείς.</li>
         <li><b>Δεδομένα ζευγαριού:</b> κωδικός πρόσκλησης, δουλειές (τίτλος, χρόνος, δυσκολία, επανάληψη), σημειώσεις σταδίων με ημερομηνία και ώρα, αστέρια και κοινός κουμπαράς.</li>
+        <li><b>Το κατοικίδιο του ζευγαριού:</b> το είδος και το όνομα που επιλέγετε, τα αντικείμενα της φωλιάς που αγοράζετε και κοινοί μετρητές (εμπειρία, η «φλόγα» του ζευγαριού, ο αριθμός κοινών δουλειών, τρυφερών λόγων και παιχνιδιών) από τους οποίους μεγαλώνει το κατοικίδιο και γεμίζει το άλμπουμ.</li>
         <li><b>Παιχνίδια:</b> οι απαντήσεις σας στα «Μάντεψε την απάντηση» και «Χάρτης επιθυμιών» (αποθηκεύονται ιδιωτικά· το ταίρι σας τις βλέπει μόνο όπως ορίζουν οι κανόνες του παιχνιδιού: και οι δύο απαντήσεις μαζί ή μόνο μια σύμπτωση), τα κουπόνια που χαρίζετε και η πρόοδος των «30 ημερών οικειότητας».</li>
         <li><b>Ανταμοιβές:</b> τίτλοι και τιμές των ανταμοιβών που προσθέτετε και οι αγορές σας με την ημερομηνία τους.</li>
         <li><b>Αντιδράσεις και τρυφερά λόγια</b> που στέλνετε στο ταίρι σας: ποιο, πότε και σε ποια δουλειά.</li>

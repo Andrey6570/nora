@@ -221,6 +221,22 @@ test("progress of 30 days: members of a pair that bought it, valid shape", async
   await assertFails(deleteDoc(doc(as("a"), "pairs/p/progress/intimacy30")));
 });
 
+test("pet: a valid kind and name only, changed by members, decor and flame stay with the server", async () => {
+  await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
+  await assertSucceeds(updateDoc(doc(as("a"), "pairs/p"), { pet: { kind: "fox", name: "Рыжик" } }));
+  await assertSucceeds(updateDoc(doc(as("b"), "pairs/p"), { pet: { kind: "panda", name: "Бамбук" } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { pet: { kind: "dragon", name: "X" } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { pet: { kind: "fox", name: "" } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { pet: { kind: "fox", name: "x".repeat(21) } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { pet: { kind: "fox", name: "ok", xp: 99 } }));
+  await assertFails(updateDoc(doc(as("x"), "pairs/p"), { pet: { kind: "fox", name: "Чужой" } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "decor.sofa": true }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { flame: { n: 99, last: "2026-10-28", freezes: 2 } }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "stats.together": 99 }));
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/n"), pairDoc(["a"], { pet: { kind: "cat", name: "Мурка" } })));
+  await assertFails(setDoc(doc(as("a"), "pairs/m"), pairDoc(["a"], { pet: { kind: "cat", name: "" } })));
+});
+
 test("a profile is private", async () => {
   await assertSucceeds(setDoc(doc(as("a"), "users/a"), { pairId: "p", lang: "el" }));
   await assertFails(getDoc(doc(as("b"), "users/a")));

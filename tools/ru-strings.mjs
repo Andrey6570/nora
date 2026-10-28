@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 const SRC = fileURLToPath(new URL("../src/", import.meta.url));
 // demo.js holds sample data, i18n files hold the translations themselves,
 // legal.js and help.js keep whole texts per language
-const SKIP = new Set(["demo.js", "i18n.js", "i18n-en.js", "i18n-el.js", "legal.js", "help.js"]);
+const SKIP = new Set(["demo.js", "i18n.js", "i18n-en.js", "i18n-el.js", "legal.js", "help.js", "petdata.js"]);
 
 export function ruStrings() {
   const keys = new Set();

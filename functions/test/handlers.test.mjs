@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated, onAnswerCreated } from "../handlers.js";
 import * as G from "../gamedata.js";
+import { stageOf, flamePatch, flameNow, prevDay, traitOf, MILESTONES, DECOR, DECOR_NAMES, STAGES } from "../pet.js";
 const { wishLevel } = G;
 import { GAMES, gameName } from "../games.js";
 import { MESSAGES, REACTIONS, pushText } from "../signals.js";
@@ -300,4 +301,117 @@ test("bad answers are removed: unknown game, out of range, locked game, wrong id
   }
   const a = ans("guess", 1, "a", { v: 1, g: 1 }), db = fakeDb({ "pairs/p": gp, "pairs/p/answers/wrong": a });
   assert.equal(await onAnswerCreated({ db, now }, { pid: "p", id: "wrong", data: a }), "bad-answer");
+});
+
+// ---- the pet ----
+test("stages follow the pair's experience", () => {
+  assert.deepEqual([0, 299, 300, 1499, 1500, 4999, 5000, 99999].map(x => stageOf(x).stage.id), ["baby", "baby", "teen", "teen", "adult", "adult", "wise", "wise"]);
+  assert.equal(stageOf(150).progress, 0.5);
+  assert.equal(stageOf(9000).next, null);
+  assert.equal(stageOf(100).toNext, 200);
+});
+
+const two = { members: ["a", "b"], flame: undefined, active: {} };
+test("the flame needs both partners on the same day and counts days in a row", () => {
+  assert.equal(prevDay("2026-03-01"), "2026-02-28");
+  assert.equal(prevDay("2027-01-01"), "2026-12-31");
+  let p = { ...two };
+  let patch = flamePatch(p, ["a"], "2026-10-27");
+  assert.deepEqual(patch, { "active.a": "2026-10-27" });
+  p = { ...p, active: { a: "2026-10-27" } };
+  patch = flamePatch(p, ["b"], "2026-10-27");
+  assert.deepEqual(patch.flame, { n: 1, last: "2026-10-27", freezes: 0 });
+  p = { ...p, active: { a: "2026-10-27", b: "2026-10-27" }, flame: patch.flame };
+  assert.equal(flamePatch(p, ["a"], "2026-10-27").flame, undefined);
+  // the next day: both active -> 2
+  patch = flamePatch({ ...p, active: { a: "2026-10-27", b: "2026-10-27" } }, ["a", "b"], "2026-10-28");
+  assert.deepEqual(patch.flame, { n: 2, last: "2026-10-28", freezes: 0 });
+  // a gap of two days starts over
+  assert.equal(flamePatch({ ...p }, ["a", "b"], "2026-10-30").flame.n, 1);
+  // a day in the past does not move it back
+  assert.equal(flamePatch({ ...p, flame: { n: 5, last: "2026-10-28", freezes: 0 } }, ["a", "b"], "2026-10-27").flame, undefined);
+  assert.equal(flamePatch({ members: ["a"], active: {} }, ["a"], "2026-10-27").flame, undefined);
+});
+
+test("a freeze covers exactly one missed day and is earned every seven days", () => {
+  const p = { members: ["a", "b"], active: {}, flame: { n: 6, last: "2026-10-26", freezes: 1 } };
+  const gap = flamePatch(p, ["a", "b"], "2026-10-28");
+  assert.deepEqual(gap.flame, { n: 7, last: "2026-10-28", freezes: 1 });
+  assert.equal(flamePatch({ ...p, flame: { n: 6, last: "2026-10-26", freezes: 0 } }, ["a", "b"], "2026-10-28").flame.n, 1);
+  assert.equal(flamePatch({ ...p, flame: { n: 13, last: "2026-10-27", freezes: 2 } }, ["a", "b"], "2026-10-28").flame.freezes, 2);
+  assert.equal(flamePatch({ ...p, flame: { n: 6, last: "2026-10-27", freezes: 0 } }, ["a", "b"], "2026-10-28").flame.freezes, 1);
+});
+
+test("the flame is shown as burning only while it can still be saved", () => {
+  assert.deepEqual(flameNow(null, "2026-10-28"), { n: 0, alive: false, today: false, freezes: 0 });
+  assert.equal(flameNow({ n: 4, last: "2026-10-28", freezes: 0 }, "2026-10-28").today, true);
+  assert.equal(flameNow({ n: 4, last: "2026-10-27", freezes: 0 }, "2026-10-28").n, 4);
+  assert.equal(flameNow({ n: 4, last: "2026-10-26", freezes: 0 }, "2026-10-28").alive, false);
+  assert.equal(flameNow({ n: 4, last: "2026-10-26", freezes: 1 }, "2026-10-28").alive, true);
+});
+
+test("a mark and a signal move the flame and the counters on the server", async () => {
+  const task = { minutes: 30, difficulty: 1, repeat: "daily" };
+  const base = { ...pair, active: {}, stats: {} };
+  const id = "t1_do_2026-10-28", data = { uid: "a", day: "2026-10-28" };
+  const db = fakeDb({ "pairs/p": base, "pairs/p/tasks/t1": task, [`pairs/p/log/${id}`]: data });
+  await onLogCreated({ db, now }, { pid: "p", logId: id, data });
+  let p = db.docs.get("pairs/p");
+  assert.deepEqual([p.active.a, p.stats.chores, p.flame], ["2026-10-28", 1, undefined]);
+  const sd = { from: "b", kind: "message", key: "love", day: "2026-10-28" };
+  db.docs.set("pairs/p/signals/s", sd); db.docs.set("pairs/p/devices/d3", { uid: "a", token: "T3", lang: "en" });
+  await onSignalCreated({ db, messaging: fakeMessaging(), now }, { pid: "p", id: "s", data: sd });
+  p = db.docs.get("pairs/p");
+  assert.deepEqual([p.stats.signals, p.flame], [1, { n: 1, last: "2026-10-28", freezes: 0 }]);
+  // done together counts for both and for the "together" counter
+  const t2 = "t1_do_once", d2 = { uid: "a", day: "2026-10-28", together: true };
+  const db2 = fakeDb({ "pairs/p": base, "pairs/p/tasks/t1": { ...task, repeat: "once" }, [`pairs/p/log/${t2}`]: d2 });
+  await onLogCreated({ db: db2, now }, { pid: "p", logId: t2, data: d2 });
+  const q = db2.docs.get("pairs/p");
+  assert.deepEqual([q.stats.together, q.flame.n, q.active.b], [1, 1, "2026-10-28"]);
+});
+
+test("revealed games count for both partners", async () => {
+  const a = ans("guess", 2, "a", { v: 1, g: 3 }), b = ans("guess", 2, "b", { v: 3, g: 1 });
+  const { db } = await answer({ [`pairs/p/answers/${idOf(a)}`]: a, "pairs/p": { ...gp, active: {} } }, b);
+  const p = db.docs.get("pairs/p");
+  assert.deepEqual([p.stats.reveals, p.flame.n, p.active.a, p.active.b], [1, 1, "2026-10-28", "2026-10-28"]);
+});
+
+test("character shows what the pair does most, and only once there is enough of it", () => {
+  assert.equal(traitOf({ chores: 3 }), null);
+  assert.equal(traitOf({ chores: 20, together: 2 }), "homebody");
+  assert.equal(traitOf({ chores: 4, together: 3, reveals: 2 }), "romantic");
+  assert.equal(traitOf({ signals: 30, chores: 10, together: 1 }), "chatty");
+  assert.equal(traitOf(undefined), null);
+});
+
+test("album milestones come from the counters", () => {
+  const got = pr => MILESTONES.filter(m => m.test(pr)).map(m => m.id);
+  assert.deepEqual(got({}), []);
+  assert.deepEqual(got({ xp: 520, flame: { n: 8 }, stats: { together: 1, signals: 1 }, decor: { a: 1, b: 1, c: 1, d: 1, e: 1 } }),
+    ["xp100", "xp500", "teen", "flame7", "together1", "signals1", "decor5"]);
+  assert.equal(new Set(MILESTONES.map(m => m.id)).size, MILESTONES.length);
+});
+
+test("decor: bought with the pot when the partner agrees, once", async () => {
+  const shop = { ...shopPair, decor: {} };
+  const { db, messaging, res } = await run({ "pairs/p": shop }, "o1", order("decor", "lamp"));
+  assert.equal(res, "proposed");
+  assert.deepEqual([db.docs.get("pairs/p/orders/o1").cost, db.docs.get("pairs/p").pot], [DECOR.lamp.cost, 50]);
+  assert.match(messaging.sent.find(m => m.tokens[0] === "T2").notification.body, /Лампа/);
+  const after = { ...db.docs.get("pairs/p/orders/o1"), approvedBy: "b" };
+  db.docs.set("pairs/p/orders/o1", after);
+  await onOrderUpdated({ db, messaging }, { pid: "p", id: "o1", before: { ...after, approvedBy: undefined }, after });
+  const p = db.docs.get("pairs/p");
+  assert.deepEqual([p.decor.lamp, p.pot, p.stats.bought], [true, 50 - DECOR.lamp.cost, 1]);
+  assert.equal((await run({ "pairs/p": p }, "o2", order("decor", "lamp"))).res, "bad-decor");
+  assert.equal((await run({ "pairs/p": shop }, "o3", order("decor", "castle"))).res, "bad-decor");
+});
+
+test("decor and pet catalogues are complete", () => {
+  assert.deepEqual(Object.keys(DECOR).sort(), Object.keys(DECOR_NAMES).sort());
+  assert.ok(Object.values(DECOR_NAMES).every(n => n.length === 3 && n.every(x => x.length > 2)));
+  assert.ok(Object.values(DECOR).every(d => Number.isInteger(d.cost) && d.cost > 0 && d.icon));
+  assert.equal(STAGES.length, 4);
 });

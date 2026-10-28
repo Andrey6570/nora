@@ -14,6 +14,10 @@ service cloud.firestore {
     }
     // a game the pair has bought (free games are never listed in pair.games)
     function unlocked(pid, g) { return get(pairPath(pid)).data.get('games', {}).get(g, false) == true; }
+    function validPet(x) {
+      return x is map && x.keys().hasOnly(['kind', 'name']) && x.kind in ['fox', 'cat', 'hedgehog', 'panda', 'raccoon']
+        && x.name is string && x.name.size() > 0 && x.name.size() <= 20;
+    }
     function validName(n) { return n is string && n.size() > 0 && n.size() <= 40; }
 
     // own profile: language, display name, current pair
@@ -40,12 +44,14 @@ service cloud.firestore {
       allow create: if signedIn()
         && request.resource.data.members == [me()]
         && request.resource.data.keys().hasOnly(['members', 'names', 'inviteCode', 'createdAt', 'scale', 'pet', 'consent'])
+        && (!('pet' in request.resource.data) || validPet(request.resource.data.pet))
         && request.resource.data.names.keys().hasOnly([me()]) && validName(request.resource.data.names[me()]);
 
       allow update: if signedIn() && ownNameOnly() && (
         // a partner changes settings
         (me() in resource.data.members
-          && changed().hasOnly(['names', 'pet', 'scale', 'inviteCode']))
+          && changed().hasOnly(['names', 'pet', 'scale', 'inviteCode'])
+          && (!('pet' in changed()) || validPet(request.resource.data.pet)))
         ||
         // a partner leaves: removes only their own id
         (me() in resource.data.members
@@ -131,7 +137,7 @@ service cloud.firestore {
         allow create: if isMember(pid)
           && request.resource.data.uid == me()
           && request.resource.data.keys().hasOnly(['uid', 'kind', 'ref', 'at'])
-          && request.resource.data.kind in ['reward', 'game']
+          && request.resource.data.kind in ['reward', 'game', 'decor']
           && request.resource.data.ref is string && request.resource.data.ref.size() <= 40;
         // the partner agrees to a proposal; either partner marks a bought reward as used
         allow update: if isMember(pid) && (

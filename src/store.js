@@ -198,6 +198,7 @@ export async function deleteAccount() {
   await appSignOut().catch(() => {});
 }
 
+export const savePet = pet => updateDoc(pairRef(), { pet });
 export const saveName = name => Promise.all([updateDoc(pairRef(), { [`names.${me()}`]: name }), setProfile({ name })]);
 export const saveScale = n => updateDoc(pairRef(), { scale: n });
 

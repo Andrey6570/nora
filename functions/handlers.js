@@ -5,6 +5,7 @@ import { stageStars, togetherStars, parseLogId, periodKey } from "./economy.js";
 import { isKnown, pushText, shopText, LIMITS } from "./signals.js";
 import { GAMES, isPaidGame, gameName, isUnlocked } from "./games.js";
 import { GUESS_OPTIONS, WISHES, WISH_ANSWERS, wishLevel } from "./gamedata.js";
+import { flamePatch, DECOR, decorName } from "./pet.js";
 
 const inc = n => FieldValue.increment(n);
 
@@ -15,6 +16,7 @@ function nearToday(day, now) {
   return Math.abs(Date.UTC(+m[1], +m[2] - 1, +m[3]) - Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())) <= 86400000;
 }
 
+const nowDay = d => d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0") + "-" + String(d.getUTCDate()).padStart(2, "0");
 const LANGS = ["ru", "en", "el"];
 const DEAD = ["messaging/registration-token-not-registered", "messaging/invalid-registration-token", "messaging/invalid-argument"];
 
@@ -50,7 +52,8 @@ export async function onSignalCreated(deps, { pid, id, data }) {
     const mine = (p.sigDay && p.sigDay[data.from]) || {};
     const used = mine.day === data.day ? mine : { day: data.day, message: 0, reaction: 0 };
     if ((used[data.kind] || 0) >= LIMITS[data.kind]) return reject("limit");
-    tx.update(pairRef, { [`sigDay.${data.from}`]: Object.assign({}, used, { [data.kind]: (used[data.kind] || 0) + 1 }) });
+    tx.update(pairRef, Object.assign({ [`sigDay.${data.from}`]: Object.assign({}, used, { [data.kind]: (used[data.kind] || 0) + 1 }), "stats.signals": inc(1) },
+      flamePatch(p, [data.from], data.day)));
     return { partner, name: (p.names && p.names[data.from]) || "" };
   });
   if (res.reason) return res.reason;
@@ -89,14 +92,19 @@ export async function onAnswerCreated({ db, now = () => new Date() }, { pid, id,
     const o = other.data(), resRef = db.doc(`pairs/${pid}/results/${data.game}_${data.item}`);
     if (data.game === "guess") {
       tx.set(resRef, { game: "guess", item: data.item, answers: { [data.uid]: { v: data.v, g: data.g }, [partner]: { v: o.v, g: o.g } }, at: now().getTime() });
+      tx.update(pairRef, Object.assign({ "stats.reveals": inc(1) }, flamePatch(p, p.members, nowDay(now()))));
       return "revealed";
     }
     const level = wishLevel(data.v, o.v);
     if (!level) return "no-match";
     tx.set(resRef, { game: "wishes", item: data.item, level, at: now().getTime() });
+    tx.update(pairRef, Object.assign({ "stats.reveals": inc(1), "stats.matches": inc(1) }, flamePatch(p, p.members, nowDay(now()))));
     return "match";
   });
 }
+
+// A game or a piece of decor is named by its catalogue id; a reward by the title the pair gave it.
+const orderName = (named, ref, title, lang) => named === "game" ? gameName(ref, lang) : named === "decor" ? decorName(ref, lang) : title;
 
 // ---- the shop: personal rewards from one's own stars, joint rewards and games from the pot with the partner's consent ----
 // An order document holds only who and what; the server decides the price, the source of the stars and the status:
@@ -119,13 +127,16 @@ export async function onOrderCreated(deps, { pid, id, data }) {
     } else if (data.kind === "game") {
       if (!isPaidGame(data.ref) || (p.games && p.games[data.ref])) return reject("bad-game");
       title = data.ref; cost = GAMES[data.ref].cost; joint = true;
+    } else if (data.kind === "decor") {
+      if (!DECOR[data.ref] || (p.decor && p.decor[data.ref])) return reject("bad-decor");
+      title = data.ref; cost = DECOR[data.ref].cost; joint = true;
     } else return reject("bad-order");
     if (!Number.isInteger(cost) || cost < 1) return reject("bad-cost");
     if (joint) {
       if (!partner) return reject("no-partner");
       if ((p.pot || 0) < cost) return reject("not-enough");
       tx.update(ref, { status: "proposed", cost, title, joint: true });
-      return { partner, name: (p.names && p.names[data.uid]) || "", title, cost, kind: "proposed", game: data.kind === "game" ? data.ref : "" };
+      return { partner, name: (p.names && p.names[data.uid]) || "", title, cost, kind: "proposed", named: data.kind === "reward" ? "" : data.kind, ref: data.ref };
     }
     if (((p.balances && p.balances[data.uid]) || 0) < cost) return reject("not-enough");
     tx.update(ref, { status: "bought", cost, title, joint: false });
@@ -134,7 +145,7 @@ export async function onOrderCreated(deps, { pid, id, data }) {
   });
   if (res.reason) return res.reason;
   if (res.done) return "bought";
-  await pushTo(deps, pid, res.partner, res.name || "Nora", lang => shopText(res.kind, lang, res.game ? gameName(res.game, lang) : res.title, res.cost));
+  await pushTo(deps, pid, res.partner, res.name || "Nora", lang => shopText(res.kind, lang, orderName(res.named, res.ref, res.title, lang), res.cost));
   return res.kind === "personal" ? "bought" : "proposed";
 }
 
@@ -151,11 +162,11 @@ export async function onOrderUpdated(deps, { pid, id, before, after }) {
     if (o.approvedBy === o.uid || !(p.members || []).includes(o.approvedBy)) { tx.update(ref, { approvedBy: FieldValue.delete() }); return { reason: "bad-approval" }; }
     if ((p.pot || 0) < o.cost) { tx.delete(ref); return { reason: "not-enough" }; }
     tx.update(ref, { status: "bought" });
-    tx.update(pairRef, Object.assign({ pot: inc(-o.cost) }, o.kind === "game" ? { [`games.${o.ref}`]: true } : {}));
-    return { buyer: o.uid, approver: o.approvedBy, title: o.title, game: o.kind === "game" ? o.ref : "", names: p.names || {} };
+    tx.update(pairRef, Object.assign({ pot: inc(-o.cost), "stats.bought": inc(1) }, o.kind === "game" ? { [`games.${o.ref}`]: true } : {}, o.kind === "decor" ? { [`decor.${o.ref}`]: true } : {}));
+    return { buyer: o.uid, approver: o.approvedBy, title: o.title, named: o.kind === "reward" ? "" : o.kind, ref: o.ref, names: p.names || {} };
   });
   if (res.reason) return res.reason;
-  await pushTo(deps, pid, res.buyer, res.names[res.approver] || "Nora", lang => shopText("approved", lang, res.game ? gameName(res.game, lang) : res.title));
+  await pushTo(deps, pid, res.buyer, res.names[res.approver] || "Nora", lang => shopText("approved", lang, orderName(res.named, res.ref, res.title, lang)));
   return "bought";
 }
 
@@ -180,13 +191,15 @@ export async function onLogCreated({ db, now = () => new Date() }, { pid, logId,
       if (parsed.stage !== "do" || (p.members || []).length !== 2) return reject("bad-together");
       const stars = togetherStars(t, p.scale);
       tx.update(logRef, { stars });
-      tx.update(pairRef, { pot: inc(stars), xp: inc(stars) });
+      // done together: both partners count for the flame
+      tx.update(pairRef, Object.assign({ pot: inc(stars), xp: inc(stars), "stats.together": inc(1) }, flamePatch(p, p.members, data.day)));
       return stars;
     }
     const stars = stageStars(t, parsed.stage, p.scale);
     if (!stars) return reject("bad-stage");
     tx.update(logRef, { stars });
-    tx.update(pairRef, { [`balances.${data.uid}`]: inc(stars), pot: inc(stars), xp: inc(stars) });
+    tx.update(pairRef, Object.assign({ [`balances.${data.uid}`]: inc(stars), pot: inc(stars), xp: inc(stars) },
+      parsed.stage === "do" ? { "stats.chores": inc(1) } : {}, flamePatch(p, [data.uid], data.day)));
     return stars;
   });
 }

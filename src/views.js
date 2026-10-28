@@ -2,6 +2,9 @@
 import { t, LANGS, getLang } from "./i18n.js";
 import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, SCOPES, REWARD_PACKS, taskGroups, weekStats, dayKey, signalsLeft, reactionsByRef, unseenSignals, shopView } from "./domain.js";
 import { GAMES } from "../functions/games.js";
+import { PET_KINDS, DECOR, decorName } from "../functions/pet.js";
+import { petView, phraseFor, MOOD_ICON } from "./pet.js";
+import { STAGE_NAMES, DEFAULT_NAMES, KIND_NAMES, TRAIT_TEXT, MILESTONE_TEXT } from "./petdata.js";
 import { gamesTab, gameScreen, gameTitle } from "./gameviews.js";
 import { REACTIONS, MESSAGES, messageText } from "../functions/signals.js";
 import { stageStars } from "../functions/economy.js";
@@ -135,7 +138,68 @@ function tasksTab(S) {
     ${empty ? "" : `<button class="fab" data-act="new-task" aria-label="${t("Добавить дело")}">＋</button>`}`;
 }
 
-const orderTitle = o => o.kind === "game" ? gameTitle(o.ref) : o.title;
+const orderTitle = o => o.kind === "game" ? gameTitle(o.ref) : o.kind === "decor" ? decorName(o.ref, getLang()) : o.title;
+const L3 = tr => tr[{ ru: 0, en: 1, el: 2 }[getLang()] ?? 1];
+const fill = (s, v) => s.replace(/\{(\w+)\}/g, (m, k) => (k in v ? v[k] : m));
+
+// ---- the pet: "the keeper of the burrow" ----
+function petSetup(S, ui) {
+  const d = ui.petDraft || (ui.petDraft = { kind: "fox", name: L3(DEFAULT_NAMES.fox) });
+  return `<section class="card pet-setup"><h2>${t("Выберите питомца")}</h2>
+    <p class="muted">${t("Он живёт в вашей норе и растёт от общих звёзд. Он никогда не болеет и не обижается: если вас долго нет, он просто дремлет.")}</p>
+    <div class="kinds">${Object.entries(PET_KINDS).map(([k, e]) => `<button class="kind ${d.kind === k ? "on" : ""}" data-act="pet-kind" data-id="${k}" aria-pressed="${d.kind === k}"><span>${e}</span>${esc(L3(KIND_NAMES[k]))}</button>`).join("")}</div>
+    <label class="field"><span>${t("Имя питомца")}</span><input data-field="petDraft.name" maxlength="20" value="${esc(d.name)}"></label>
+    ${err(ui)}<button class="btn primary" data-act="pet-save" ${d.name.trim() && !ui.busy ? "" : "disabled"}>${t("Готово")}</button></section>`;
+}
+
+function petCard(S, ui) {
+  const p = S.pair, me = S.user.uid, today = dayKey();
+  if (!p.pet) return petSetup(S, ui);
+  const v = petView(S, me, today), other = partnerOf(p, me), stageName = L3(STAGE_NAMES[v.stage.stage.id]);
+  const ph = phraseFor(S, me, today, v.meters, {}, { grew: ui.grew != null, pats: ui.pats || 0 });
+  const vars = { pet: esc(p.pet.name), name: esc(nameOf(p, other) || ""), n: ph.situation === "partnerBusy"
+    ? (S.logList || []).filter(l => l.day === today && l.uid !== me && l.stars > 0 && !l.together).length : v.flame.n, stage: stageName };
+  const bar = (label, val, cls) => `<div class="meter"><span>${t(label)}</span><div class="mbar"><i class="${cls}" style="width:${Math.max(4, val)}%"></i></div></div>`;
+  const next = v.stage.next ? t("До «{x}»: {n} ★", { x: L3(STAGE_NAMES[v.stage.next.id]), n: v.stage.toNext }) : t("Высшая стадия");
+  const acc = { adult: "🧣", wise: "👑" }[v.stage.stage.id] || "";
+  return `<section class="card petcard"><button class="pet-stage ${ui.bounce ? "bounce" : ""}" data-act="pet-pat" aria-label="${t("Погладить")}">
+      <span class="pet" style="font-size:${v.stage.stage.size}px">${PET_KINDS[p.pet.kind]}</span>${acc ? `<span class="pet-acc">${acc}</span>` : ""}<span class="pet-mood">${MOOD_ICON[v.mood]}</span></button>
+    <h2>${esc(p.pet.name)}</h2>
+    <p class="muted">${esc(stageName)}${v.trait ? " · " + esc(L3(TRAIT_TEXT[v.trait]).split(":")[0]) : ""}</p>
+    <div class="bubble">${esc(fill(L3(ph.text), vars).replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">"))}</div>
+    <div class="xpbar" title="${next}"><i style="width:${Math.round(v.stage.progress * 100)}%"></i></div><p class="muted small">${next}</p>
+    ${bar("Уют", v.meters.comfort, "b-do")}${bar("Забота", v.meters.care, "b-notice")}${bar("Близость", v.meters.close, "b-plan")}
+    <div class="flame ${v.flame.alive ? "on" : ""}"><b>🔥 ${v.flame.n}</b><span>${v.flame.alive ? (v.flame.today ? t("Огонёк пары: сегодня вы оба здесь") : t("Огонёк пары горит. Сегодня нужны вы оба")) : t("Огонёк пары погас. Зажгите его: сегодня сделайте что-нибудь оба")}${v.flame.freezes ? ` · ❄️ ${v.flame.freezes}` : ""}</span></div>
+    ${v.trait ? `<p class="muted small">${esc(L3(TRAIT_TEXT[v.trait]))}</p>` : ""}
+    <div class="row"><button class="btn" data-act="burrow" data-v="burrow">🏡 ${t("Жильё питомца")}</button><button class="btn" data-act="burrow" data-v="album">📷 ${t("Альбом")}</button>
+    <button class="btn ghost" data-act="pet-edit">${t("Имя")}</button></div></section>`;
+}
+
+function burrowSheet(S, ui) {
+  const p = S.pair, me = S.user.uid, tab = ui.sheet.tab, v = petView(S, me, dayKey()), pot = p.pot || 0;
+  const head = `<h2>${tab === "burrow" ? "🏡 " + t("Жильё питомца") : "📷 " + t("Альбом")}</h2>${seg("burrow-tab", [["burrow", "Жильё питомца"], ["album", "Альбом"]], tab)}`;
+  if (tab === "album") {
+    const got = v.milestones.filter(m => m.got).length;
+    return `${head}<p class="muted">${t("Собрано: {a} из {b}", { a: got, b: v.milestones.length })}</p>
+      <div class="album">${v.milestones.map(m => `<div class="mcard ${m.got ? "got" : ""}"><span>${m.got ? m.icon : "🔒"}</span><small>${esc(L3(MILESTONE_TEXT[m.id]))}</small></div>`).join("")}</div>
+      <div class="row"><button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
+  }
+  const props = (S.orders || []).filter(o => o.kind === "decor" && o.status === "proposed");
+  const item = ([id, d]) => {
+    const own = v.owned.includes(id), prop = props.find(o => o.ref === id);
+    let act;
+    if (own) act = `<span class="chip">${t("Есть")}</span>`;
+    else if (prop && prop.uid === me) act = `<button class="btn ghost" data-act="cancel-order" data-id="${esc(prop.id)}">${t("Отозвать")}</button>`;
+    else if (prop) act = `<button class="btn primary" data-act="approve-order" data-id="${esc(prop.id)}" ${pot >= prop.cost ? "" : "disabled"}>${t("Согласен")}</button><button class="btn ghost" data-act="cancel-order" data-id="${esc(prop.id)}">${t("Отклонить")}</button>`;
+    else act = `<button class="btn" data-act="buy-decor" data-id="${id}" ${pot >= d.cost && (p.members || []).length === 2 ? "" : "disabled"}>${t("Предложить")} ${star(d.cost)}</button>`;
+    return `<li class="order"><div><b>${d.icon} ${esc(decorName(id, getLang()))}</b>${prop ? `<small>${prop.uid === me ? t("Ждёт согласия") : t("{name} предлагает купить", { name: esc(nameOf(p, prop.uid)) })}</small>` : ""}</div><div class="order-btns">${act}</div></li>`;
+  };
+  return `${head}
+    <div class="scene"><span class="scene-pet">${p.pet ? PET_KINDS[p.pet.kind] : "🦊"}</span>${v.owned.map(k => `<span class="scene-item" title="${esc(decorName(k, getLang()))}">${DECOR[k].icon}</span>`).join("") || `<p class="muted small">${t("Нора пока пуста. Обустройте её на звёзды копилки.")}</p>`}</div>
+    <p class="muted small">${t("Предметы покупаются из копилки, когда партнёр согласен. В копилке: {n} ★", { n: pot })}</p>
+    <ul class="orders">${Object.entries(DECOR).sort((a, b) => a[1].cost - b[1].cost).map(item).join("")}</ul>
+    <div class="row"><button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
+}
 
 // Rewards: personal ones are bought from one's own stars at once, joint ones are proposed and spent from the pot when the partner agrees.
 function shopSection(S) {
@@ -166,7 +230,7 @@ function shopSection(S) {
   </section>`;
 }
 
-function usTab(S) {
+function usTab(S, ui) {
   const p = S.pair, me = S.user.uid, members = p.members || [];
   const { by: stats, together } = weekStats(S.logList, members, dayKey());
   const max = Math.max(1, ...members.map(u => stats[u].total));
@@ -177,8 +241,9 @@ function usTab(S) {
       <div class="bar">${part("notice")}${part("plan")}${part("do")}</div>
       <p class="meta">👀 ${s.notice} · 🗓 ${s.plan} · ✅ ${s.do}</p></div>`;
   };
-  return `${members.length < 2 ? invite(p) : `<section class="card pair"><div class="duo">🦊🦊</div>
-      <h2>${members.map(u => esc(nameOf(p, u))).join(" & ")}</h2></section>`}
+  return `${members.length < 2 ? invite(p) : ""}
+    ${petCard(S, ui)}
+    <p class="pair-names muted">${members.map(u => esc(nameOf(p, u))).join(" & ")}</p>
     <section class="card pot"><span class="muted">${t("Общая копилка")}</span><div class="big-num">${star(p.pot || 0)}</div>
       <p class="muted">${t("Каждая звезда идёт и тому, кто её заработал, и в общую копилку. Дела, сделанные вдвоём, приносят в копилку двойные звёзды.")}</p></section>
     ${members.length === 2 ? shopSection(S) : ""}
@@ -255,7 +320,7 @@ const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "�
 
 export function main(S, ui) {
   if (ui.game) return gameScreen(S, ui) + (ui.sheet ? sheet(S, ui) : "");
-  const body = ui.tab === "us" ? usTab(S) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "games" ? ((S.pair.members || []).length < 2 ? invite(S.pair) : "") + gamesTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
+  const body = ui.tab === "us" ? usTab(S, ui) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "games" ? ((S.pair.members || []).length < 2 ? invite(S.pair) : "") + gamesTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
   const unseen = ui.tab === "warm" ? 0 : unseenSignals(S.signals || [], S.user.uid, ui.seenAt || 0);
   return `<header class="top"><b>${t("Нора")}</b>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
     <main class="page">${body}${err(ui)}</main>
@@ -370,6 +435,10 @@ function sheet(S, ui) {
   const buying = k === "buy" && (S.rewards || []).find(r => r.id === ui.sheet.id);
   const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet(S, ui)
     : k === "buygame" ? confirmSheet("Открыть игру?", t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: gameTitle(ui.sheet.id), n: GAMES[ui.sheet.id].cost }), "buy-game-yes", "Предложить", ui.sheet.id, true)
+    : k === "petname" ? `<h2>${t("Имя питомца")}</h2><label class="field"><span>${t("Имя питомца")}</span><input data-field="petDraft.name" maxlength="20" value="${esc(ui.petDraft.name)}"></label>${err(ui)}
+        <div class="row"><button class="btn primary" data-act="pet-name-save">${t("Сохранить")}</button><button class="btn ghost" data-act="close">${t("Отмена")}</button></div>`
+    : k === "burrow" ? burrowSheet(S, ui)
+    : k === "buydecor" ? confirmSheet("Купить для норы?", t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: decorName(ui.sheet.id, getLang()), n: DECOR[ui.sheet.id].cost }), "buy-decor-yes", "Предложить", ui.sheet.id, true)
     : k === "reward" ? rewardForm(S, ui) : k === "rewardpacks" ? rewardPacksSheet(S, ui)
     : k === "buy" ? (buying ? confirmSheet(buying.scope === "joint" ? "Предложить партнёру?" : "Купить награду?",
         buying.scope === "joint" ? t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: buying.title, n: buying.cost }) : t("«{x}» за {n} ★ из ваших звёзд. Они спишутся сразу.", { x: buying.title, n: buying.cost }),
