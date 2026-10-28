@@ -1,0 +1,11 @@
+{
+  "appId": "com.andrey6570.nora",
+  "appName": "Nora",
+  "webDir": "dist",
+  "plugins": {
+    "FirebaseAuthentication": {
+      "skipNativeAuth": true,
+      "providers": ["google.com"]
+    }
+  }
+}
