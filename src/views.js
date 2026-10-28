@@ -1,6 +1,7 @@
 // Screens as HTML strings. Buttons carry data-act (and data-id) for the click handler in main.js.
 import { t, LANGS, getLang } from "./i18n.js";
-import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, taskGroups, weekStats, dayKey } from "./domain.js";
+import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, taskGroups, weekStats, dayKey, signalsLeft, reactionsByRef, unseenSignals } from "./domain.js";
+import { REACTIONS, MESSAGES, messageText } from "../functions/signals.js";
 import { stageStars } from "../functions/economy.js";
 import { LEGAL } from "./legal.js";
 import { HELP } from "./help.js";
@@ -86,14 +87,17 @@ function summary(S) {
   </div>`;
 }
 
-function stageBtn(S, v, s) {
+function stageBtn(S, v, s, reactions) {
   const icon = STAGE_ICONS[s.stage];
   if (s.mark) {
     const mine = s.mark.uid === S.user.uid;
     const got = s.mark.stars ? "+" + s.mark.stars : "…";
     const who = s.mark.together ? "👫 " + esc(t("Вдвоём")) : icon + " " + esc(nameOf(S.pair, s.mark.uid));
-    return `<button class="stage done ${mine ? "mine" : ""} ${s.mark.together ? "together" : ""}" ${mine ? `data-act="undo" data-id="${esc(s.id)}"` : "disabled"}
-      aria-label="${esc(t(STAGE_LABELS[s.stage]))}: ${s.mark.together ? esc(t("Вдвоём")) : esc(nameOf(S.pair, s.mark.uid))}">${who} <span class="star">★</span>${got}</button>`;
+    const rx = (reactions.get(s.id) || []).map(k => REACTIONS[k] || "").join("");
+    // your own mark can be taken back, the partner's one can get a reaction
+    const act = mine ? `data-act="undo" data-id="${esc(s.id)}"` : `data-act="react" data-id="${esc(s.id)}"`;
+    return `<button class="stage done ${mine ? "mine" : "theirs"} ${s.mark.together ? "together" : ""}" ${act}
+      aria-label="${esc(t(STAGE_LABELS[s.stage]))}: ${s.mark.together ? esc(t("Вдвоём")) : esc(nameOf(S.pair, s.mark.uid))}">${who} <span class="star">★</span>${got}${rx ? ` <span class="rx">${rx}</span>` : ""}</button>`;
   }
   const btn = `<button class="stage" data-act="claim" data-task="${esc(v.task.id)}" data-stage="${s.stage}">${icon} ${esc(t(STAGE_LABELS[s.stage]))} <span class="star">★</span>${s.stars}</button>`;
   // done together: double stars, all into the shared pot
@@ -102,19 +106,20 @@ function stageBtn(S, v, s) {
   return btn + both;
 }
 
-function taskCard(S, v) {
+function taskCard(S, v, reactions) {
   const tk = v.task;
   const meta = [t("{n} мин", { n: tk.minutes }), t((DIFFS.find(d => d[0] === tk.difficulty) || DIFFS[0])[1]), t((REPEAT_LABELS.find(r => r[0] === tk.repeat) || REPEAT_LABELS[0])[1])];
   return `<article class="task ${v.done ? "is-done" : ""}">
     <div class="task-h"><h3>${esc(tk.title)}</h3><button class="icon" data-act="edit-task" data-id="${esc(tk.id)}" aria-label="${t("Изменить")}">⋯</button></div>
     <p class="meta">${meta.map(esc).join(" · ")}</p>
-    <div class="stages">${v.stages.map(s => stageBtn(S, v, s)).join("")}</div>
+    <div class="stages">${v.stages.map(s => stageBtn(S, v, s, reactions)).join("")}</div>
   </article>`;
 }
 
 function tasksTab(S) {
   const g = taskGroups(S.tasks, S.logs, S.pair.scale, dayKey());
-  const section = (title, list) => list.length ? `<h2 class="sec">${t(title)}</h2>${list.map(v => taskCard(S, v)).join("")}` : "";
+  const reactions = reactionsByRef(S.signals || []);
+  const section = (title, list) => list.length ? `<h2 class="sec">${t(title)}</h2>${list.map(v => taskCard(S, v, reactions)).join("")}` : "";
   const empty = !S.tasks.length;
   return `${(S.pair.members || []).length < 2 ? invite(S.pair) : ""}
     ${summary(S)}
@@ -151,6 +156,42 @@ function usTab(S) {
     </section>`;
 }
 
+function ago(at) {
+  const min = Math.max(0, Math.round((Date.now() - at) / 60000));
+  if (min < 1) return t("только что");
+  if (min < 60) return t("{n} мин назад", { n: min });
+  const h = Math.round(min / 60);
+  return h < 24 ? t("{n} ч назад", { n: h }) : t("{n} дн назад", { n: Math.round(h / 24) });
+}
+
+function warmthTab(S) {
+  const p = S.pair, me = S.user.uid, today = dayKey(), alone = (p.members || []).length < 2;
+  const left = signalsLeft(p, me, today, "message");
+  const logs = S.logs;
+  const feedLine = sg => {
+    const mine = sg.from === me, who = mine ? t("Вы") : nameOf(p, sg.from);
+    let text;
+    if (sg.kind === "message") text = `${(MESSAGES[sg.key] || {}).icon || ""} ${esc(messageText(sg.key, getLang()))}`;
+    else {
+      const parsed = sg.ref && S.tasks.find(x => sg.ref.startsWith(x.id + "_"));
+      text = `${REACTIONS[sg.key] || ""} ${parsed ? t("реакция на «{x}»", { x: esc(parsed.title) }) : t("реакция")}`;
+    }
+    return `<li class="${mine ? "mine" : ""}"><b>${esc(who)}</b><span>${text}</span><small>${esc(ago(sg.at || 0))}</small></li>`;
+  };
+  const recent = (S.signals || []).slice(0, 25);
+  return `${alone ? invite(p) : ""}
+    <section class="card"><h2>${t("Тёплые слова")}</h2>
+      <p class="muted">${alone ? t("Когда партнёр присоединится, здесь можно будет отправлять тёплые слова одним нажатием.")
+        : t("Одно нажатие, и партнёр получит уведомление. Осталось сегодня: {n}", { n: left })}</p>
+      <div class="signals">${Object.entries(MESSAGES).map(([k, m]) =>
+        `<button class="signal" data-act="signal" data-id="${k}" ${alone || !left ? "disabled" : ""}><span>${m.icon}</span>${esc(messageText(k, getLang()))}</button>`).join("")}</div>
+    </section>
+    <section class="card"><h2>${t("Лента")}</h2>
+      ${recent.length ? `<ul class="feed">${recent.map(feedLine).join("")}</ul>` : `<p class="muted">${t("Здесь появятся реакции и тёплые слова.")}</p>`}
+      <p class="muted small">${t("Реакцию на дело партнёра можно поставить во вкладке «Дела»: нажмите на его отметку.")}</p>
+    </section>`;
+}
+
 function settingsTab(S, ui) {
   const p = S.pair;
   return `<section class="card"><h2>${t("Профиль")}</h2>
@@ -175,14 +216,15 @@ function settingsTab(S, ui) {
     <p class="muted center-text small">${t("Нора")} 0.1</p>`;
 }
 
-const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["settings", "⚙️", "Настройки"]];
+const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "💌", "Тепло"], ["settings", "⚙️", "Настройки"]];
 
 export function main(S, ui) {
-  const body = ui.tab === "us" ? usTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
+  const body = ui.tab === "us" ? usTab(S) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
+  const unseen = ui.tab === "warm" ? 0 : unseenSignals(S.signals || [], S.user.uid, ui.seenAt || 0);
   return `<header class="top"><b>${t("Нора")}</b>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
     <main class="page">${body}${err(ui)}</main>
     <nav class="tabs">${TABS.map(([id, icon, label]) =>
-      `<button class="${ui.tab === id ? "on" : ""}" data-act="tab" data-v="${id}" aria-current="${ui.tab === id}"><span>${icon}</span>${t(label)}</button>`).join("")}</nav>
+      `<button class="${ui.tab === id ? "on" : ""}" data-act="tab" data-v="${id}" aria-current="${ui.tab === id}"><span>${icon}${id === "warm" && unseen ? `<i class="dot" aria-label="${unseen}">${unseen}</i>` : ""}</span>${t(label)}</button>`).join("")}</nav>
     ${ui.sheet ? sheet(S, ui) : ""}`;
 }
 
@@ -250,9 +292,19 @@ export function overlay(S, ui) {
   return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${k === "doc" ? docSheet(ui.sheet.v) : helpSheet(ui)}</div>`;
 }
 
+function reactSheet(S, ui) {
+  const left = signalsLeft(S.pair, S.user.uid, dayKey(), "reaction");
+  return `<h2>${t("Реакция на отметку")}</h2>
+    <p class="muted">${left ? t("Партнёр получит уведомление. Осталось сегодня: {n}", { n: left }) : t("Лимит реакций на сегодня исчерпан.")}</p>
+    <div class="reactions">${Object.entries(REACTIONS).map(([k, e]) =>
+      `<button class="react" data-act="react-send" data-id="${k}" data-ref="${esc(ui.sheet.id)}" ${left ? "" : "disabled"} aria-label="${k}">${e}</button>`).join("")}</div>
+    <div class="row"><button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
+}
+
 function sheet(S, ui) {
   const k = ui.sheet.type;
   if (k === "doc" || k === "help") return overlay(S, ui);
+  if (k === "react") return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${reactSheet(S, ui)}</div>`;
   const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet(S, ui)
     : k === "undo" ? confirmSheet("Отменить отметку?", "Звёзды за этот этап вернутся.", "undo-yes", "Отменить отметку", ui.sheet.id)
     : k === "delete" ? confirmSheet("Удалить аккаунт?", "Ваш профиль, имя в паре и запись входа будут удалены сразу, это нельзя отменить. Ваши отметки останутся в истории пары без имени. Для подтверждения нужно ещё раз войти через Google.", "delete-yes", "Удалить навсегда")

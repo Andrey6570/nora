@@ -73,6 +73,29 @@ service cloud.firestore {
           && request.resource.data.full is bool;
       }
 
+      // reactions and warm signals: the server checks them, applies the daily limit and sends the push
+      match /signals/{id} {
+        allow read: if isMember(pid);
+        allow create: if isMember(pid)
+          && request.resource.data.from == me()
+          && request.resource.data.keys().hasOnly(['from', 'kind', 'key', 'ref', 'day', 'at'])
+          && request.resource.data.kind in ['message', 'reaction']
+          && request.resource.data.key is string && request.resource.data.key.size() <= 30
+          && request.resource.data.day is string
+          && (!('ref' in request.resource.data) || (request.resource.data.ref is string && request.resource.data.ref.size() <= 120));
+        allow update, delete: if false;
+      }
+
+      // this phone's push token, so the other partner's actions can reach it
+      match /devices/{id} {
+        allow read: if false;
+        allow create, update: if isMember(pid)
+          && request.resource.data.uid == me()
+          && request.resource.data.keys().hasOnly(['uid', 'token', 'lang', 'at'])
+          && request.resource.data.token is string && request.resource.data.lang in ['ru', 'en', 'el'];
+        allow delete: if isMember(pid) && resource.data.uid == me();
+      }
+
       // a mark that a stage is done; the id names the task, stage and period, so each is claimed once
       match /log/{id} {
         allow read: if isMember(pid);

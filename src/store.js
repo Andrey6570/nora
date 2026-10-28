@@ -2,11 +2,12 @@
 import { onAuthStateChanged, deleteUser } from "firebase/auth";
 import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, deleteField } from "firebase/firestore";
 import { auth, db, googleSignIn, appSignOut } from "./fb.js";
+import { startPush, stopPush, pushSupported } from "./push.js";
 import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
-import { newInviteCode, normCode, dayKey, logCutoff } from "./domain.js";
+import { newInviteCode, normCode, dayKey, logCutoff, uid as newId } from "./domain.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], error: "" };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], error: "" };
 
 let notify = () => {};
 let unsubs = [];
@@ -19,7 +20,7 @@ const userRef = () => doc(db, "users", me());
 
 function stopPair() {
   unsubs.forEach(f => f()); unsubs = [];
-  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = [];
+  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = []; M.signals = [];
   RECENT.clear(); ONCE.clear();
 }
 function rebuildLogs() {
@@ -44,6 +45,9 @@ function watchPair(pid) {
   unsubs.push(onSnapshot(query(collection(db, ...base, "log"), where("day", ">=", logCutoff(dayKey()))), s => {
     RECENT.clear(); rows(s).forEach(r => RECENT.set(r.id, r)); rebuildLogs();
   }, onErr));
+  unsubs.push(onSnapshot(query(collection(db, ...base, "signals"), where("day", ">=", logCutoff(dayKey()))), s => {
+    M.signals = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify();
+  }, onErr));
   unsubs.push(onSnapshot(query(collection(db, ...base, "log"), where("once", "==", true)), s => {
     ONCE.clear(); rows(s).forEach(r => ONCE.set(r.id, r)); rebuildLogs();
   }, onErr));
@@ -66,7 +70,31 @@ export function start(onChange) {
 }
 
 export const signIn = () => googleSignIn();
-export async function signOutAll() { stopPair(); await appSignOut(); }
+export async function signOutAll() { await unregisterDevice(); stopPair(); await appSignOut(); }
+
+// ---- push: this phone's token, so the partner's reactions and signals reach it ----
+let token = "", deviceLang = "ru", onPushMessage = () => {};
+const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
+function deviceId() { let id = LS.get("nora-device"); if (!id) { id = newId(); LS.set("nora-device", id); } return id; }
+async function writeDevice() {
+  if (!token || !M.pair || !M.user) return;
+  await setDoc(doc(db, "pairs", M.pair.id, "devices", deviceId()), { uid: me(), token, lang: deviceLang, at: Date.now() });
+}
+export async function registerDevice(lang, onMessage) {
+  if (!pushSupported()) return false;
+  deviceLang = lang; onPushMessage = onMessage || onPushMessage;
+  return startPush(t => { token = t; writeDevice().catch(() => {}); }, m => onPushMessage(m));
+}
+export const setDeviceLang = lang => { deviceLang = lang; return writeDevice().catch(() => {}); };
+async function unregisterDevice() {
+  if (!M.pair || !M.user || !token) return;
+  await deleteDoc(doc(db, "pairs", M.pair.id, "devices", deviceId())).catch(() => {});
+  token = ""; await stopPush();
+}
+
+// A reaction to a mark or a warm signal. The server checks it, counts the daily limit and sends the push.
+export const sendSignal = (kind, key, ref) => addDoc(collection(db, "pairs", M.pair.id, "signals"),
+  Object.assign({ from: me(), kind, key, day: dayKey(), at: Date.now() }, ref ? { ref } : {}));
 
 async function setProfile(patch) {
   M.profile = Object.assign({}, M.profile, patch);
@@ -111,6 +139,7 @@ export async function newInvite() {
 
 export async function leavePair() {
   const ref = pairRef();
+  await unregisterDevice();
   stopPair();
   await updateDoc(ref, { members: arrayRemove(me()) });
   await setProfile({ pairId: null });
@@ -123,6 +152,7 @@ export async function deleteAccount() {
   const uid = me(), pid = M.pair && M.pair.id;
   const cred = await googleSignIn();
   if (cred.user.uid !== uid) throw { code: "other-account" };
+  await unregisterDevice();
   stopPair();
   if (pid) {
     const ref = doc(db, "pairs", pid);

@@ -1,4 +1,5 @@
 // What the screens show, derived from the pair, its tasks and its marks. No Firebase here.
+import { LIMITS } from "../functions/signals.js";
 import { STAGES, stageStars, togetherStars, periodKey, logId, parseLogId, dayKey } from "../functions/economy.js";
 
 export { STAGES, dayKey };
@@ -83,4 +84,23 @@ export function weekStats(logList, members, today) {
 export function logCutoff(today) {
   const [y, m, d] = today.split("-").map(Number);
   return dayKey(new Date(y, m - 1, d - 8));
+}
+
+// ---- reactions and warm signals ----
+// How many signals of a kind this partner can still send today (the server counts them in pair.sigDay).
+export function signalsLeft(pair, uid, today, kind) {
+  const used = pair && pair.sigDay && pair.sigDay[uid];
+  return Math.max(0, LIMITS[kind] - (used && used.day === today ? used[kind] || 0 : 0));
+}
+
+// Reactions under each mark: Map markId -> [reaction key, ...]
+export function reactionsByRef(signals) {
+  const m = new Map();
+  for (const s of signals) if (s.kind === "reaction" && s.ref) (m.get(s.ref) || m.set(s.ref, []).get(s.ref)).push(s.key);
+  return m;
+}
+
+// Signals from the partner that arrived after the moment the Warmth tab was last opened.
+export function unseenSignals(signals, uid, seenAt) {
+  return signals.filter(s => s.from !== uid && s.kind === "message" && (s.at || 0) > seenAt).length;
 }

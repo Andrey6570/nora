@@ -2,8 +2,9 @@
 // screen before Firebase is set up, and drives the layout smoke test. It awards stars the way the server does.
 import { stageStars, togetherStars, parseLogId, DEFAULT_SCALE } from "../functions/economy.js";
 import { newInviteCode, dayKey, uid } from "./domain.js";
+import { isKnown, LIMITS } from "../functions/signals.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], error: "", demo: true };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], error: "", demo: true };
 let notify = () => {};
 const ME = "me", PARTNER = "partner";
 const sync = () => { M.logList = [...M.logs.values()]; notify(); };
@@ -32,6 +33,12 @@ function seed(stage) {
   mark("t4_notice_once", PARTNER, dayKey(y));
   mark("t4_plan_once", PARTNER, today);
   mark("t5_notice_once", ME, today);
+  M.pair.sigDay = { [ME]: { day: today, message: 1, reaction: 0 } };
+  M.signals = [
+    { id: "s1", from: PARTNER, kind: "message", key: "thanks_dinner", day: today, at: now - 3600e3 },
+    { id: "s2", from: PARTNER, kind: "reaction", key: "heart", ref: "t2_do_" + dayKey(y), day: today, at: now - 3000e3 },
+    { id: "s3", from: ME, kind: "message", key: "proud", day: today, at: now - 7200e3 }
+  ];
 }
 
 function award(id, data) {
@@ -78,6 +85,18 @@ export async function addTasks(tasks) {
   tasks.forEach((t, i) => M.tasks.push(Object.assign({}, t, { id: uid(), createdAt: Date.now() + i })));
   notify();
 }
+// Same checks as the server: known signal, daily limit.
+export async function sendSignal(kind, key, ref) {
+  if (!isKnown(kind, key)) return;
+  const today = dayKey(), used = M.pair.sigDay && M.pair.sigDay[ME];
+  const n = used && used.day === today ? used[kind] || 0 : 0;
+  if (n >= LIMITS[kind]) throw { code: "limit" };
+  M.pair.sigDay = Object.assign({}, M.pair.sigDay, { [ME]: Object.assign({ day: today, message: 0, reaction: 0 }, used && used.day === today ? used : {}, { [kind]: n + 1 }) });
+  M.signals = [{ id: uid(), from: ME, kind, key, day: today, at: Date.now(), ...(ref ? { ref } : {}) }, ...M.signals];
+  notify();
+}
+export async function registerDevice() { return false; }
+export async function setDeviceLang() {}
 export async function claim(view, stage, together) {
   if (M.logs.has(stage.id)) throw { code: "already-exists" };
   award(stage.id, Object.assign({ uid: ME, day: dayKey(), at: Date.now() }, together ? { together: true } : {})); sync();

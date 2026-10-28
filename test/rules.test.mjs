@@ -89,6 +89,33 @@ test("marks: own, without stars, claimed once, taken back only by the author", a
   await assertFails(setDoc(doc(as("b"), "pairs/p/log/v_do_once"), { uid: "b", day: "2026-10-28", at: 1, together: "yes" }));
 });
 
+test("signals: from me, a known shape, never changed or deleted by clients", async () => {
+  await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
+  const sig = { from: "a", kind: "message", key: "love", day: "2026-10-28", at: 1 };
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/signals/s1"), sig));
+  await assertSucceeds(setDoc(doc(as("b"), "pairs/p/signals/s2"), { from: "b", kind: "reaction", key: "heart", ref: "t_do_once", day: "2026-10-28", at: 1 }));
+  await assertSucceeds(getDoc(doc(as("b"), "pairs/p/signals/s1")));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/signals/s3"), sig));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/signals/s4"), { ...sig, kind: "ad" }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/signals/s5"), { ...sig, extra: 1 }));
+  await assertFails(setDoc(doc(as("x"), "pairs/p/signals/s6"), { ...sig, from: "x" }));
+  await assertFails(getDoc(doc(as("x"), "pairs/p/signals/s1")));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/signals/s1"), { key: "miss" }));
+  await assertFails(deleteDoc(doc(as("a"), "pairs/p/signals/s1")));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "sigDay.a": { day: "x", message: 0, reaction: 0 } }));
+});
+
+test("devices: own token only, not readable from the app, deleted by the owner", async () => {
+  await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
+  const dev = { uid: "a", token: "tok", lang: "el", at: 1 };
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/devices/d1"), dev));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/devices/d2"), dev));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/devices/d3"), { ...dev, lang: "fr" }));
+  await assertFails(getDoc(doc(as("a"), "pairs/p/devices/d1")));
+  await assertFails(deleteDoc(doc(as("b"), "pairs/p/devices/d1")));
+  await assertSucceeds(deleteDoc(doc(as("a"), "pairs/p/devices/d1")));
+});
+
 test("a profile is private", async () => {
   await assertSucceeds(setDoc(doc(as("a"), "users/a"), { pairId: "p", lang: "el" }));
   await assertFails(getDoc(doc(as("b"), "users/a")));

@@ -10,10 +10,10 @@ const S = store && store.M;
 
 const $ = s => document.querySelector(s);
 const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
-const THEME_KEY = "nora-theme";
+const THEME_KEY = "nora-theme", SEEN_KEY = "nora-seen-signals";
 const NEW_TASK = () => ({ title: "", minutes: 15, difficulty: 1, repeat: "once", full: true });
 
-const ui = { tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
+const ui = { seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
 
 // ---------- messages ----------
 function errText(e) {
@@ -25,6 +25,7 @@ function errText(e) {
   if (/need-consent/.test(c)) return t("Нужно подтвердить согласие");
   if (/need-title/.test(c)) return t("Напишите, что нужно сделать");
   if (/other-account/.test(c)) return t("Для удаления войдите в тот же аккаунт Google.");
+  if (/limit/.test(c)) return t("Лимит на сегодня исчерпан.");
   if (/already-exists|permission-denied/.test(c)) return t("Этот этап уже отметили. Обновите экран.");
   if (/network|unavailable/.test(c)) return t("Нет связи с интернетом");
   return t("Не получилось") + (c ? " (" + c + ")" : "");
@@ -105,10 +106,17 @@ const actions = {
     if (!ui.consent) throw { code: "need-consent" };
     await store.joinPair(ui.code, name);
   }, "Вы в паре!"),
-  tab: el => { ui.tab = el.dataset.v; ui.err = ""; render(); },
+  tab: el => {
+    ui.tab = el.dataset.v; ui.err = "";
+    if (ui.tab === "warm") { ui.seenAt = Date.now(); LS.set(SEEN_KEY, String(ui.seenAt)); }
+    render();
+  },
+  signal: el => run(() => store.sendSignal("message", el.dataset.id), "Отправлено"),
+  react: el => { ui.err = ""; ui.sheet = { type: "react", id: el.dataset.id }; render(); },
+  "react-send": el => run(async () => { await store.sendSignal("reaction", el.dataset.id, el.dataset.ref); ui.sheet = null; }, "Отправлено"),
   set: el => {
     const { name, v } = el.dataset;
-    if (name === "lang") { setLang(v); store && S.user && store.saveLang(v).catch(() => {}); render(); return; }
+    if (name === "lang") { setLang(v); if (store && S.user) { store.saveLang(v).catch(() => {}); store.setDeviceLang(v); } render(); return; }
     if (name === "theme") { ui.theme = v; LS.set(THEME_KEY, v); applyTheme(); render(); return; }
     if (name === "scale") { run(() => store.saveScale(Number(v)), "Сохранено"); return; }
     if (name === "help-tab") { ui.sheet.tab = v; render(); return; }
@@ -181,7 +189,15 @@ document.addEventListener("keydown", e => { if (e.key === "Escape" && ui.sheet) 
 setLang(getLang());
 applyTheme();
 try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render()); } catch (e) {}
-if (store) store.start(render);
+let registered = false;
+function afterRender() {
+  // ask for the notification permission once, when the pair is open
+  if (store && !registered && S.user && S.pair && !S.pair.loading) {
+    registered = true;
+    store.registerDevice(getLang(), m => toast([m.title, m.body].filter(Boolean).join(": "), 4000));
+  }
+}
+if (store) store.start(() => { render(); afterRender(); });
 render();
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
   import("@capacitor/app").then(({ App }) => App.addListener("backButton", ({ canGoBack }) => {

@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onLogCreated, onLogDeleted, onPairUpdated } from "../handlers.js";
+import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated } from "../handlers.js";
+import { MESSAGES, REACTIONS, pushText } from "../signals.js";
 import { baseStars, stageStars, weekKey, periodKey, logId, parseLogId } from "../economy.js";
 
 // In-memory stand-in for the Admin Firestore surface the handlers use.
@@ -21,9 +22,19 @@ function fakeDb(seed) {
     update: async patch => apply(path, patch),
     delete: async () => { docs.delete(path); }
   });
+  // collection(path).where(field, "==", value).get(): direct children only
+  const collection = path => ({
+    where: (f, op, v) => ({
+      get: async () => ({
+        docs: [...docs.keys()].filter(k => k.startsWith(path + "/") && !k.slice(path.length + 1).includes("/") && docs.get(k)[f] === v)
+          .map(k => ({ ref: ref(k), data: () => structuredClone(docs.get(k)) }))
+      })
+    })
+  });
   return {
     docs,
     doc: ref,
+    collection,
     runTransaction: async fn => fn({ get: r => r.get(), update: (r, p) => apply(r.path, p), delete: r => docs.delete(r.path) }),
     recursiveDelete: async r => { for (const k of [...docs.keys()]) if (k === r.path || k.startsWith(r.path + "/")) docs.delete(k); }
   };
@@ -107,4 +118,59 @@ test("an empty pair is deleted with its contents and invite", async () => {
   assert.equal(await onPairUpdated({ db }, { pid: "q", after: { members: ["c"] } }), false);
   assert.equal(await onPairUpdated({ db }, { pid: "p", after: { members: [], inviteCode: "ABC" } }), true);
   assert.deepEqual([...db.docs.keys()], ["pairs/q"]);
+});
+
+// ---- reactions and warm signals ----
+function fakeMessaging(deadTokens = []) {
+  const sent = [];
+  return { sent, sendEachForMulticast: async m => { sent.push(m); return { responses: m.tokens.map(t => deadTokens.includes(t) ? { success: false, error: { code: "messaging/registration-token-not-registered" } } : { success: true }) }; } };
+}
+const sigPair = { members: ["a", "b"], names: { a: "Андрей", b: "Мария" }, scale: 10 };
+const devs = { "pairs/p/devices/d1": { uid: "b", token: "T1", lang: "el" }, "pairs/p/devices/d2": { uid: "b", token: "T2", lang: "ru" }, "pairs/p/devices/d3": { uid: "a", token: "T3", lang: "en" } };
+const sig = { from: "a", kind: "message", key: "love", day: "2026-10-28" };
+
+test("the catalogue has all three languages for every message", () => {
+  for (const [k, m] of Object.entries(MESSAGES)) for (const l of ["ru", "en", "el"]) assert.ok(m[l] && m[l].length < 60, k + " " + l);
+  assert.equal(Object.keys(REACTIONS).length, 5);
+});
+
+test("a warm signal is pushed to the partner's devices in their language", async () => {
+  const db = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/signals/s": sig }), messaging = fakeMessaging();
+  assert.equal(await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data: sig }), "sent");
+  assert.deepEqual(messaging.sent.map(m => [m.tokens[0], m.notification.title, m.notification.body]), [["T1", "Андрей", "Σ' αγαπώ"], ["T2", "Андрей", "Люблю тебя"]]);
+  assert.deepEqual(db.docs.get("pairs/p").sigDay.a, { day: "2026-10-28", message: 1, reaction: 0 });
+});
+
+test("a reaction names the chore", async () => {
+  const data = { from: "b", kind: "reaction", key: "heart", ref: "t1_do_2026-10-28", day: "2026-10-28" };
+  const db = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/tasks/t1": { title: "Помыть посуду" }, "pairs/p/signals/s": data }), messaging = fakeMessaging();
+  assert.equal(await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data }), "sent");
+  assert.deepEqual(messaging.sent.map(m => [m.tokens[0], m.notification.body]), [["T3", "❤️ Reaction to “Помыть посуду”"]]);
+  assert.equal(pushText("reaction", "fire", "ru", ""), "🔥 Реакция на ваше дело");
+});
+
+test("the daily limit stops the eleventh message and the next day starts afresh", async () => {
+  const db = fakeDb({ "pairs/p": { ...sigPair, sigDay: { a: { day: "2026-10-28", message: 10, reaction: 0 } } }, ...devs, "pairs/p/signals/s": sig }), messaging = fakeMessaging();
+  assert.equal(await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data: sig }), "limit");
+  assert.equal(db.docs.has("pairs/p/signals/s"), false);
+  assert.equal(messaging.sent.length, 0);
+  const d2 = fakeDb({ "pairs/p": { ...sigPair, sigDay: { a: { day: "2026-10-27", message: 10, reaction: 0 } } }, ...devs, "pairs/p/signals/s": sig });
+  assert.equal(await onSignalCreated({ db: d2, messaging, now }, { pid: "p", id: "s", data: sig }), "sent");
+});
+
+test("bad signals are removed: unknown key, outsider, no partner, old day", async () => {
+  const cases = [["unknown key", sigPair, { ...sig, key: "nope" }], ["outsider", sigPair, { ...sig, from: "x" }],
+    ["no partner", { ...sigPair, members: ["a"] }, sig], ["old day", sigPair, { ...sig, day: "2026-10-01" }]];
+  for (const [name, pair, data] of cases) {
+    const db = fakeDb({ "pairs/p": pair, ...devs, "pairs/p/signals/s": data }), messaging = fakeMessaging();
+    assert.notEqual(await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data }), "sent", name);
+    assert.equal(db.docs.has("pairs/p/signals/s"), false, name);
+    assert.equal(messaging.sent.length, 0, name);
+  }
+});
+
+test("a device whose token is dead is removed", async () => {
+  const db = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/signals/s": sig }), messaging = fakeMessaging(["T1"]);
+  await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data: sig });
+  assert.deepEqual([db.docs.has("pairs/p/devices/d1"), db.docs.has("pairs/p/devices/d2")], [false, true]);
 });

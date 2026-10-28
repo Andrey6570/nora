@@ -15,6 +15,8 @@ export const LEGAL = {
         <li><b>Учётная запись Google:</b> идентификатор, адрес почты и имя из профиля Google. Их хранит сервис входа Firebase Authentication.</li>
         <li><b>Имя в приложении,</b> которое вы указали сами.</li>
         <li><b>Данные пары:</b> код приглашения, дела (название, время, сложность, повтор), отметки этапов с датой и временем, звёзды и общая копилка.</li>
+        <li><b>Реакции и тёплые слова,</b> которые вы отправляете партнёру: какая именно, когда и к какому делу.</li>
+        <li><b>Данные для уведомлений</b> (только в приложении для Android и только если вы разрешили уведомления): токен вашего устройства и язык интерфейса.</li>
         <li><b>Настройки:</b> язык, а также версия и дата вашего согласия с этой политикой.</li>
         <li><b>Технические журналы</b> Google (например, IP-адрес при обращении к серверу) — для безопасности работы сервиса.</li>
       </ul>Мы не собираем геолокацию, контакты, фотографии и рекламные идентификаторы, не используем аналитику и рекламу.`],
@@ -24,13 +26,14 @@ export const LEGAL = {
         <li>Хранение записи о вашем согласии — исполнение обязанности подтверждать соблюдение GDPR (ст. 6(1)(c) и 7(1) GDPR).</li>
       </ul>`],
       ["Кто видит ваши данные", `<ul>
-        <li><b>Ваш партнёр по паре</b> видит ваше имя в приложении, дела, отметки и звёзды. Ваша почта партнёру не показывается.</li>
-        <li><b>Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions) обрабатывает данные по нашему поручению как обработчик. Данные хранятся в Европейском союзе (регионы eur3 и europe-west1). Если отдельные данные передаются в США, передача основана на EU-US Data Privacy Framework и стандартных договорных условиях ЕС.</li>
+        <li><b>Ваш партнёр по паре</b> видит ваше имя в приложении, дела, отметки, звёзды, реакции и тёплые слова. Ваша почта партнёру не показывается.</li>
+        <li><b>Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions, Cloud Messaging для уведомлений) обрабатывает данные по нашему поручению как обработчик. Данные хранятся в Европейском союзе (регионы eur3 и europe-west1). Если отдельные данные передаются в США, передача основана на EU-US Data Privacy Framework и стандартных договорных условиях ЕС.</li>
       </ul>Мы не продаём данные и не передаём их третьим лицам для рекламы.`],
       ["Сколько мы храним данные", `<ul>
         <li>Пока у вас есть учётная запись.</li>
         <li>Если вы выйдете из пары, ваше имя и отметки остаются в её истории, пока пара существует или пока вы не удалите учётную запись.</li>
         <li>При удалении учётной записи («Настройки → Удалить аккаунт») мы сразу удаляем ваш профиль, имя в паре и запись входа. Ваши отметки остаются в истории пары без имени, только с техническим идентификатором, и удаляются вместе с парой.</li>
+        <li>Токен устройства для уведомлений удаляется, когда вы выходите из аккаунта или из пары, удаляете аккаунт, а также когда Google сообщает, что токен больше не действует.</li>
         <li>Когда из пары вышли оба партнёра, пара удаляется со всеми делами и отметками автоматически.</li>
         <li>Технические журналы и резервные копии Google удаляются в сроки, установленные Google.</li>
       </ul>`],
@@ -45,6 +48,8 @@ export const LEGAL = {
         <li><b>Google account:</b> identifier, email address and name from your Google profile, stored by the Firebase Authentication sign-in service.</li>
         <li><b>Your name in the app,</b> which you enter yourself.</li>
         <li><b>Pair data:</b> invite code, chores (title, time, difficulty, repeat), stage marks with date and time, stars and the shared pot.</li>
+        <li><b>Reactions and warm words</b> you send to your partner: which one, when and to which chore.</li>
+        <li><b>Notification data</b> (Android app only, and only if you allow notifications): your device's token and the interface language.</li>
         <li><b>Settings:</b> language, and the version and date of your consent to this policy.</li>
         <li><b>Technical logs</b> kept by Google (for example, the IP address of a request to the server) for the security of the service.</li>
       </ul>We do not collect location, contacts, photos or advertising identifiers, and we use no analytics or advertising.`],
@@ -54,13 +59,14 @@ export const LEGAL = {
         <li>Keeping a record of your consent — our duty to demonstrate GDPR compliance (Art. 6(1)(c) and 7(1) GDPR).</li>
       </ul>`],
       ["Who sees your data", `<ul>
-        <li><b>Your partner in the pair</b> sees your name in the app, chores, marks and stars. Your email is not shown to them.</li>
-        <li><b>Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions) processes data on our behalf as a processor. Data is stored in the European Union (regions eur3 and europe-west1). Where some data is transferred to the United States, the transfer relies on the EU-US Data Privacy Framework and the EU Standard Contractual Clauses.</li>
+        <li><b>Your partner in the pair</b> sees your name in the app, chores, marks, stars, reactions and warm words. Your email is not shown to them.</li>
+        <li><b>Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions, Cloud Messaging for notifications) processes data on our behalf as a processor. Data is stored in the European Union (regions eur3 and europe-west1). Where some data is transferred to the United States, the transfer relies on the EU-US Data Privacy Framework and the EU Standard Contractual Clauses.</li>
       </ul>We do not sell data or share it with third parties for advertising.`],
       ["How long we keep data", `<ul>
         <li>As long as you have an account.</li>
         <li>If you leave a pair, your name and marks stay in its history while the pair exists or until you delete your account.</li>
         <li>When you delete your account (Settings → Delete account), we immediately delete your profile, your name in the pair and your sign-in record. Your marks stay in the pair's history without your name, only with a technical identifier, and are deleted together with the pair.</li>
+        <li>Your device's notification token is deleted when you sign out, leave the pair or delete your account, and when Google reports that the token is no longer valid.</li>
         <li>When both partners have left a pair, it is deleted automatically with all its chores and marks.</li>
         <li>Technical logs and Google's backups are deleted within the periods set by Google.</li>
       </ul>`],
@@ -75,6 +81,8 @@ export const LEGAL = {
         <li><b>Λογαριασμός Google:</b> αναγνωριστικό, διεύθυνση email και όνομα από το προφίλ Google, που αποθηκεύονται από την υπηρεσία σύνδεσης Firebase Authentication.</li>
         <li><b>Το όνομά σας στην εφαρμογή,</b> το οποίο εισάγετε εσείς.</li>
         <li><b>Δεδομένα ζευγαριού:</b> κωδικός πρόσκλησης, δουλειές (τίτλος, χρόνος, δυσκολία, επανάληψη), σημειώσεις σταδίων με ημερομηνία και ώρα, αστέρια και κοινός κουμπαράς.</li>
+        <li><b>Αντιδράσεις και τρυφερά λόγια</b> που στέλνετε στο ταίρι σας: ποιο, πότε και σε ποια δουλειά.</li>
+        <li><b>Δεδομένα ειδοποιήσεων</b> (μόνο στην εφαρμογή Android και μόνο αν επιτρέψετε ειδοποιήσεις): το διακριτικό (token) της συσκευής σας και η γλώσσα της εφαρμογής.</li>
         <li><b>Ρυθμίσεις:</b> γλώσσα, καθώς και η έκδοση και η ημερομηνία της συναίνεσής σας σε αυτή την πολιτική.</li>
         <li><b>Τεχνικά αρχεία καταγραφής</b> της Google (για παράδειγμα, η διεύθυνση IP ενός αιτήματος προς τον διακομιστή) για την ασφάλεια της υπηρεσίας.</li>
       </ul>Δεν συλλέγουμε τοποθεσία, επαφές, φωτογραφίες ή διαφημιστικά αναγνωριστικά και δεν χρησιμοποιούμε αναλυτικά εργαλεία ή διαφημίσεις.`],
@@ -84,13 +92,14 @@ export const LEGAL = {
         <li>Τήρηση αρχείου της συναίνεσής σας — υποχρέωσή μας να αποδεικνύουμε τη συμμόρφωση με τον ΓΚΠΔ (άρθρα 6 παρ. 1 στοιχ. γ΄ και 7 παρ. 1 ΓΚΠΔ).</li>
       </ul>`],
       ["Ποιος βλέπει τα δεδομένα σας", `<ul>
-        <li><b>Το ταίρι σας στο ζευγάρι</b> βλέπει το όνομά σας στην εφαρμογή, τις δουλειές, τις σημειώσεις και τα αστέρια. Το email σας δεν εμφανίζεται.</li>
-        <li><b>Η Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions) επεξεργάζεται δεδομένα για λογαριασμό μας ως εκτελών την επεξεργασία. Τα δεδομένα αποθηκεύονται στην Ευρωπαϊκή Ένωση (περιοχές eur3 και europe-west1). Όπου ορισμένα δεδομένα διαβιβάζονται στις Ηνωμένες Πολιτείες, η διαβίβαση βασίζεται στο Πλαίσιο Προστασίας Δεδομένων ΕΕ-ΗΠΑ και στις Τυποποιημένες Συμβατικές Ρήτρες της ΕΕ.</li>
+        <li><b>Το ταίρι σας στο ζευγάρι</b> βλέπει το όνομά σας στην εφαρμογή, τις δουλειές, τις σημειώσεις, τα αστέρια, τις αντιδράσεις και τα τρυφερά λόγια. Το email σας δεν εμφανίζεται.</li>
+        <li><b>Η Google</b> (Firebase: Authentication, Cloud Firestore, Cloud Functions, Cloud Messaging για ειδοποιήσεις) επεξεργάζεται δεδομένα για λογαριασμό μας ως εκτελών την επεξεργασία. Τα δεδομένα αποθηκεύονται στην Ευρωπαϊκή Ένωση (περιοχές eur3 και europe-west1). Όπου ορισμένα δεδομένα διαβιβάζονται στις Ηνωμένες Πολιτείες, η διαβίβαση βασίζεται στο Πλαίσιο Προστασίας Δεδομένων ΕΕ-ΗΠΑ και στις Τυποποιημένες Συμβατικές Ρήτρες της ΕΕ.</li>
       </ul>Δεν πωλούμε δεδομένα και δεν τα κοινοποιούμε σε τρίτους για διαφήμιση.`],
       ["Για πόσο διατηρούμε τα δεδομένα", `<ul>
         <li>Όσο διατηρείτε λογαριασμό.</li>
         <li>Αν αποχωρήσετε από ένα ζευγάρι, το όνομα και οι σημειώσεις σας παραμένουν στο ιστορικό του όσο υπάρχει το ζευγάρι ή μέχρι να διαγράψετε τον λογαριασμό σας.</li>
         <li>Με τη διαγραφή του λογαριασμού (Ρυθμίσεις → Διαγραφή λογαριασμού) διαγράφουμε αμέσως το προφίλ σας, το όνομά σας στο ζευγάρι και το αρχείο σύνδεσης. Οι σημειώσεις σας παραμένουν στο ιστορικό του ζευγαριού χωρίς όνομα, μόνο με τεχνικό αναγνωριστικό, και διαγράφονται μαζί με το ζευγάρι.</li>
+        <li>Το διακριτικό ειδοποιήσεων της συσκευής σας διαγράφεται όταν αποσυνδέεστε, αποχωρείτε από το ζευγάρι ή διαγράφετε τον λογαριασμό σας, καθώς και όταν η Google αναφέρει ότι το διακριτικό δεν ισχύει πλέον.</li>
         <li>Όταν αποχωρήσουν και τα δύο μέλη, το ζευγάρι διαγράφεται αυτόματα με όλες τις δουλειές και τις σημειώσεις.</li>
         <li>Τα τεχνικά αρχεία καταγραφής και τα αντίγραφα ασφαλείας της Google διαγράφονται εντός των προθεσμιών που ορίζει η Google.</li>
       </ul>`],
