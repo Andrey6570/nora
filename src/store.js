@@ -1,10 +1,10 @@
 // Live data from Firestore plus every write the app makes. Stars are never written here: the server awards them.
-import { onAuthStateChanged } from "firebase/auth";
-import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove } from "firebase/firestore";
+import { onAuthStateChanged, deleteUser } from "firebase/auth";
+import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, deleteField } from "firebase/firestore";
 import { auth, db, googleSignIn, appSignOut } from "./fb.js";
 import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
-import { newInviteCode, normCode, dayKey, logCutoff, PACKS, packTask } from "./domain.js";
+import { newInviteCode, normCode, dayKey, logCutoff } from "./domain.js";
 
 export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], error: "" };
 
@@ -116,6 +116,24 @@ export async function leavePair() {
   await setProfile({ pairId: null });
 }
 
+// GDPR erasure: remove the name from the pair, leave it, delete the profile and the sign-in record.
+// Marks stay in the pair's history with the technical id only and go away with the pair.
+// Google asks for a fresh sign-in before an account can be deleted, so we sign in again first.
+export async function deleteAccount() {
+  const uid = me(), pid = M.pair && M.pair.id;
+  const cred = await googleSignIn();
+  if (cred.user.uid !== uid) throw { code: "other-account" };
+  stopPair();
+  if (pid) {
+    const ref = doc(db, "pairs", pid);
+    await updateDoc(ref, { [`names.${uid}`]: deleteField() });
+    await updateDoc(ref, { members: arrayRemove(uid) });
+  }
+  await deleteDoc(doc(db, "users", uid));
+  await deleteUser(auth.currentUser);
+  await appSignOut().catch(() => {});
+}
+
 export const saveName = name => Promise.all([updateDoc(pairRef(), { [`names.${me()}`]: name }), setProfile({ name })]);
 export const saveScale = n => updateDoc(pairRef(), { scale: n });
 
@@ -126,17 +144,13 @@ export async function saveTask(t) {
   return ref.id;
 }
 export const deleteTask = id => deleteDoc(doc(db, "pairs", M.pair.id, "tasks", id));
-export async function addPack(packId, tr) {
-  const pack = PACKS.find(p => p.id === packId);
+export async function addTasks(tasks) {
   const b = writeBatch(db);
-  pack.tasks.forEach((row, i) => {
-    const task = packTask(row);
-    b.set(doc(collection(db, "pairs", M.pair.id, "tasks")), Object.assign(task, { title: tr(task.title), createdBy: me(), createdAt: Date.now() + i }));
-  });
+  tasks.forEach((task, i) => b.set(doc(collection(db, "pairs", M.pair.id, "tasks")), Object.assign(taskFields(task), { createdBy: me(), createdAt: Date.now() + i })));
   await b.commit();
 }
 
-// Mark a stage as done. The id makes it unique; the server checks it and awards the stars.
-export const claim = (view, stage) => setDoc(doc(db, "pairs", M.pair.id, "log", stage.id),
-  Object.assign({ uid: me(), day: dayKey(), at: Date.now() }, view.period === "once" ? { once: true } : {}));
+// Mark a stage as done (alone or, for the doing stage, together). The id makes it unique; the server checks it and awards the stars.
+export const claim = (view, stage, together) => setDoc(doc(db, "pairs", M.pair.id, "log", stage.id),
+  Object.assign({ uid: me(), day: dayKey(), at: Date.now() }, view.period === "once" ? { once: true } : {}, together ? { together: true } : {}));
 export const unclaim = markId => deleteDoc(doc(db, "pairs", M.pair.id, "log", markId));

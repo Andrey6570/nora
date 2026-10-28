@@ -2,7 +2,7 @@ import "./styles.css";
 import { t, getLang, setLang } from "./i18n.js";
 import * as V from "./views.js";
 import { configured } from "./fb.js";
-import { taskView, dayKey } from "./domain.js";
+import { taskView, dayKey, PACKS, packTask } from "./domain.js";
 
 const demo = new URLSearchParams(location.search).has("demo");
 const store = demo ? await import("./demo.js") : configured ? await import("./store.js") : null;
@@ -24,6 +24,7 @@ function errText(e) {
   if (/need-name/.test(c)) return t("Введите имя");
   if (/need-consent/.test(c)) return t("Нужно подтвердить согласие");
   if (/need-title/.test(c)) return t("Напишите, что нужно сделать");
+  if (/other-account/.test(c)) return t("Для удаления войдите в тот же аккаунт Google.");
   if (/already-exists|permission-denied/.test(c)) return t("Этот этап уже отметили. Обновите экран.");
   if (/network|unavailable/.test(c)) return t("Нет связи с интернетом");
   return t("Не получилось") + (c ? " (" + c + ")" : "");
@@ -56,6 +57,8 @@ function render() {
   else if (!S.pair) { if (!ui.name && S.profile && S.profile.name) ui.name = S.profile.name; html = V.welcome(ui); screen = "welcome"; }
   else if (S.pair.loading) { html = V.loading(); screen = "loading"; }
   else { if (!ui.name) ui.name = S.pair.names[S.user.uid] || ""; html = V.main(S, ui); screen = "main:" + ui.tab; }
+  // documents and help also open before sign-in
+  if (!screen.startsWith("main") && ui.sheet) html += V.overlay(S, ui);
   const scroll = window.scrollY;
   app.innerHTML = html;
   if (screen === lastScreen) window.scrollTo(0, scroll); else window.scrollTo(0, 0);
@@ -108,6 +111,7 @@ const actions = {
     if (name === "lang") { setLang(v); store && S.user && store.saveLang(v).catch(() => {}); render(); return; }
     if (name === "theme") { ui.theme = v; LS.set(THEME_KEY, v); applyTheme(); render(); return; }
     if (name === "scale") { run(() => store.saveScale(Number(v)), "Сохранено"); return; }
+    if (name === "help-tab") { ui.sheet.tab = v; render(); return; }
     setField(name, name === "d.repeat" ? v : Number(v));
     render();
   },
@@ -131,16 +135,35 @@ const actions = {
     await store.saveTask(d); ui.sheet = null;
   }, "Сохранено"),
   "delete-task": el => run(async () => { await store.deleteTask(el.dataset.id); ui.sheet = null; }, "Дело удалено"),
-  packs: () => { ui.err = ""; ui.sheet = { type: "packs" }; render(); },
-  "add-pack": el => run(async () => { await store.addPack(el.dataset.id, t); ui.sheet = null; }, "Набор добавлен"),
+  packs: () => { ui.err = ""; ui.sheet = { type: "packs", picked: new Set() }; render(); },
+  pick: el => { const p = ui.sheet.picked, id = el.dataset.id; p.has(id) ? p.delete(id) : p.add(id); render(); },
+  "pick-all": el => {
+    const have = new Set(S.tasks.map(x => x.title.trim().toLowerCase()));
+    const pack = PACKS.find(p => p.id === el.dataset.id);
+    const ids = pack.tasks.map((r, i) => [pack.id + ":" + i, t(r[0])]).filter(([, title]) => !have.has(title.toLowerCase())).map(([id]) => id);
+    const p = ui.sheet.picked, all = ids.every(id => p.has(id));
+    ids.forEach(id => all ? p.delete(id) : p.add(id));
+    render();
+  },
+  "add-picked": () => run(async () => {
+    const tasks = [...ui.sheet.picked].map(id => {
+      const [packId, i] = id.split(":"), task = packTask(PACKS.find(p => p.id === packId).tasks[Number(i)]);
+      return Object.assign(task, { title: t(task.title) });
+    });
+    await store.addTasks(tasks); ui.sheet = null;
+  }, "Дела добавлены"),
   claim: el => {
     const v = findView(el.dataset.task); if (!v) return;
     const stage = v.stages.find(s => s.stage === el.dataset.stage);
-    run(() => store.claim(v, stage));
+    run(() => store.claim(v, stage, !!el.dataset.together), el.dataset.together ? "Вместе — двойные звёзды в копилку!" : "");
   },
   undo: el => { ui.sheet = { type: "undo", id: el.dataset.id }; render(); },
   "undo-yes": el => run(async () => { await store.unclaim(el.dataset.id); ui.sheet = null; }),
   leave: () => { ui.sheet = { type: "leave" }; render(); },
+  doc: el => { ui.sheet = { type: "doc", v: el.dataset.v }; render(); document.querySelector(".sheet").scrollTop = 0; },
+  help: () => { ui.sheet = { type: "help", tab: "guide" }; render(); },
+  "delete-account": () => { ui.sheet = { type: "delete" }; render(); },
+  "delete-yes": () => run(async () => { await store.deleteAccount(); ui.sheet = null; ui.tab = "tasks"; ui.name = ""; ui.consent = false; ui.welcome = "choose"; }, "Аккаунт удалён"),
   "leave-yes": () => run(async () => { ui.sheet = null; ui.tab = "tasks"; await store.leavePair(); }),
   close: () => { ui.sheet = null; ui.err = ""; render(); }
 };

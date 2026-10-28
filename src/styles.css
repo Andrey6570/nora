@@ -88,7 +88,7 @@ button, input, select { font: inherit; color: inherit; }
   font-size: 20px; border-bottom: 1px solid var(--line);
 }
 .badge { margin-left: 8px; font-size: 12px; font-weight: 600; vertical-align: middle; padding: 2px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); }
-.page { padding: 12px 16px calc(96px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.page { padding: 12px 16px calc(150px + env(safe-area-inset-bottom)); max-width: 640px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
 .tabs {
   position: fixed; bottom: 0; left: 0; right: 0; z-index: 6; display: flex; background: var(--surface);
   border-top: 1px solid var(--line); padding-bottom: env(safe-area-inset-bottom);
@@ -120,8 +120,10 @@ button, input, select { font: inherit; color: inherit; }
   border: 1px dashed var(--accent); background: transparent; border-radius: 999px; padding: 8px 12px; min-height: 40px;
   cursor: pointer; font-size: 14px; font-weight: 600; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+.stage.together { border-color: var(--plan); }
 .stage.done { border-style: solid; border-color: var(--line); background: var(--surface-2); font-weight: 500; cursor: default; }
 .stage.done.mine { border-color: var(--good); cursor: pointer; }
+.stage.done.together { border-color: var(--plan); }
 
 .fab {
   position: fixed; right: 16px; bottom: calc(72px + env(safe-area-inset-bottom)); z-index: 7; width: 56px; height: 56px;
@@ -145,9 +147,16 @@ button, input, select { font: inherit; color: inherit; }
 .legend span { display: flex; align-items: center; gap: 6px; }
 .legend i { width: 10px; height: 10px; border-radius: 3px; }
 
-/* packs */
-.pack { display: flex; gap: 12px; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--line); }
-.pack > div { min-width: 0; }
+/* ready-made chores */
+.pack-h { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+.small-btn { min-height: 36px; padding: 6px 10px; font-size: 14px; }
+.pick { display: flex; gap: 12px; align-items: center; width: 100%; text-align: left; border: 0; border-bottom: 1px solid var(--line); background: none; padding: 10px 2px; min-height: 52px; cursor: pointer; }
+.pick:disabled { opacity: .5; cursor: default; }
+.pick .box { flex: none; width: 24px; height: 24px; border-radius: 6px; border: 2px solid var(--line); display: grid; place-items: center; font-weight: 700; color: var(--accent-ink); }
+.pick.on .box { background: var(--accent); border-color: var(--accent); }
+.pick-t { display: flex; flex-direction: column; min-width: 0; }
+.pick-t small { color: var(--muted); font-size: 13px; }
+.sheet-foot { position: sticky; bottom: calc(-20px - env(safe-area-inset-bottom)); background: var(--bg); padding: 12px 0 4px; margin-top: 8px; }
 
 /* bottom sheet */
 .scrim { position: fixed; inset: 0; background: rgba(0, 0, 0, .4); z-index: 20; }
@@ -164,3 +173,14 @@ button, input, select { font: inherit; color: inherit; }
   transition: opacity .2s, transform .2s; max-width: calc(100vw - 32px);
 }
 #toast.on { opacity: 1; transform: translate(-50%, 0); }
+
+/* documents and help */
+.doc-links { font-size: 13px; color: var(--muted); text-align: center; }
+.doc-links a, .check a, .doc a { color: var(--accent); }
+.doc h3 { margin: 16px 0 6px; font-size: 16px; }
+.doc ul { margin: 6px 0; padding-left: 20px; }
+.doc li { margin: 4px 0; }
+.doc mark { background: #FFE58A; color: #2B211B; padding: 0 2px; border-radius: 3px; }
+.help details { border-bottom: 1px solid var(--line); padding: 10px 0; }
+.help summary { font-weight: 600; cursor: pointer; min-height: 28px; }
+.help p { margin-top: 6px; color: var(--muted); }

@@ -11,5 +11,5 @@ export const firebaseConfig = {
 
 // Version of the privacy policy and terms the user agrees to. Change it when the texts change materially.
 export const POLICY_VERSION = "2026-10";
-// Public address of the folder with the legal pages, with a trailing slash. Fill in once the pages are hosted.
-export const LEGAL_URL = "";
+// Public address of the legal pages (Firebase Hosting, built by tools/build-legal.mjs), for store listings.
+export const LEGAL_URL = "https://nora-d2fdf.web.app/legal/";

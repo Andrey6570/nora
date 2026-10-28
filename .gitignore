@@ -11,3 +11,6 @@ android/local.properties
 # Google Play upload key: kept in a CI secret, never in git
 android/app/upload.jks
 *.b64
+
+# public legal pages, built from src/legal.js by tools/build-legal.mjs
+hosting/

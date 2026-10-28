@@ -2,6 +2,8 @@
 import { t, LANGS, getLang } from "./i18n.js";
 import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, taskGroups, weekStats, dayKey } from "./domain.js";
 import { stageStars } from "../functions/economy.js";
+import { LEGAL } from "./legal.js";
+import { HELP } from "./help.js";
 
 export const esc = s => String(s == null ? "" : s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const star = n => `<span class="star">★</span>${n}`;
@@ -27,12 +29,18 @@ export function signIn(ui) {
     <button class="btn primary big" data-act="signin" ${ui.busy ? "disabled" : ""}>${t("Войти через Google")}</button>
     ${err(ui)}
     <div class="foot">${langChips()}</div>
+    ${docLinks()}
   </main>`;
 }
 
+const docLinks = () => `<p class="doc-links"><a href="#" data-act="doc" data-v="privacy">${t("Политика конфиденциальности")}</a> ·
+  <a href="#" data-act="doc" data-v="terms">${t("Условия использования")}</a></p>`;
+
 export function welcome(ui) {
   const consent = `<label class="check"><input type="checkbox" data-field="consent" ${ui.consent ? "checked" : ""}>
-    <span>${t("Подтверждаю, что мне есть 18 лет, и принимаю условия и политику конфиденциальности")}</span></label>`;
+    <span>${t("Подтверждаю, что мне есть 18 лет, и принимаю {terms} и {privacy}", {
+      terms: `<a href="#" data-act="doc" data-v="terms">${t("условия использования")}</a>`,
+      privacy: `<a href="#" data-act="doc" data-v="privacy">${t("политику конфиденциальности")}</a>` })}</span></label>`;
   const name = `<label class="field"><span>${t("Как вас зовут")}</span>
     <input data-field="name" maxlength="40" autocomplete="given-name" value="${esc(ui.name)}" placeholder="${t("Имя")}"></label>`;
   let body;
@@ -53,7 +61,7 @@ export function welcome(ui) {
       <button class="btn big" data-act="welcome" data-v="join">${t("У меня есть код")}</button>
       <button class="btn ghost" data-act="signout">${t("Выйти из аккаунта")}</button>`;
   }
-  return `<main class="center narrow"><div class="logo">🦊</div><h1>${t("Добро пожаловать")}</h1>${body}${err(ui)}</main>`;
+  return `<main class="center narrow"><div class="logo">🦊</div><h1>${t("Добро пожаловать")}</h1>${body}${err(ui)}${docLinks()}</main>`;
 }
 
 function invite(pair) {
@@ -83,10 +91,15 @@ function stageBtn(S, v, s) {
   if (s.mark) {
     const mine = s.mark.uid === S.user.uid;
     const got = s.mark.stars ? "+" + s.mark.stars : "…";
-    return `<button class="stage done ${mine ? "mine" : ""}" ${mine ? `data-act="undo" data-id="${esc(s.id)}"` : "disabled"}
-      aria-label="${esc(t(STAGE_LABELS[s.stage]))}: ${esc(nameOf(S.pair, s.mark.uid))}">${icon} ${esc(nameOf(S.pair, s.mark.uid))} <span class="star">★</span>${got}</button>`;
+    const who = s.mark.together ? "👫 " + esc(t("Вдвоём")) : icon + " " + esc(nameOf(S.pair, s.mark.uid));
+    return `<button class="stage done ${mine ? "mine" : ""} ${s.mark.together ? "together" : ""}" ${mine ? `data-act="undo" data-id="${esc(s.id)}"` : "disabled"}
+      aria-label="${esc(t(STAGE_LABELS[s.stage]))}: ${s.mark.together ? esc(t("Вдвоём")) : esc(nameOf(S.pair, s.mark.uid))}">${who} <span class="star">★</span>${got}</button>`;
   }
-  return `<button class="stage" data-act="claim" data-task="${esc(v.task.id)}" data-stage="${s.stage}">${icon} ${esc(t(STAGE_LABELS[s.stage]))} <span class="star">★</span>${s.stars}</button>`;
+  const btn = `<button class="stage" data-act="claim" data-task="${esc(v.task.id)}" data-stage="${s.stage}">${icon} ${esc(t(STAGE_LABELS[s.stage]))} <span class="star">★</span>${s.stars}</button>`;
+  // done together: double stars, all into the shared pot
+  const both = s.together && (S.pair.members || []).length === 2
+    ? `<button class="stage together" data-act="claim" data-together="1" data-task="${esc(v.task.id)}" data-stage="${s.stage}">👫 ${esc(t("Вдвоём"))} <span class="star">★</span>${s.together}</button>` : "";
+  return btn + both;
 }
 
 function taskCard(S, v) {
@@ -110,13 +123,13 @@ function tasksTab(S) {
       <div class="row"><button class="btn primary" data-act="new-task">${t("Добавить дело")}</button>
       <button class="btn" data-act="packs">${t("Готовые наборы")}</button></div></section>` : ""}
     ${section("Каждый день", g.daily)}${section("На этой неделе", g.weekly)}${section("Разовые", g.once)}${section("Готово сегодня", g.doneOnce)}
-    ${empty ? "" : `<div class="row end"><button class="btn ghost" data-act="packs">${t("Готовые наборы")}</button></div>`}
+    ${empty ? "" : `<div class="row"><button class="btn" data-act="packs">${t("Готовые наборы")}</button></div>`}
     ${empty ? "" : `<button class="fab" data-act="new-task" aria-label="${t("Добавить дело")}">＋</button>`}`;
 }
 
 function usTab(S) {
   const p = S.pair, me = S.user.uid, members = p.members || [];
-  const stats = weekStats(S.logList, members, dayKey());
+  const { by: stats, together } = weekStats(S.logList, members, dayKey());
   const max = Math.max(1, ...members.map(u => stats[u].total));
   const bar = u => {
     const s = stats[u];
@@ -128,10 +141,12 @@ function usTab(S) {
   return `${members.length < 2 ? invite(p) : `<section class="card pair"><div class="duo">🦊🦊</div>
       <h2>${members.map(u => esc(nameOf(p, u))).join(" & ")}</h2></section>`}
     <section class="card pot"><span class="muted">${t("Общая копилка")}</span><div class="big-num">${star(p.pot || 0)}</div>
-      <p class="muted">${t("Каждая звезда идёт и тому, кто её заработал, и в общую копилку. Скоро на неё можно будет выбрать совместную награду.")}</p></section>
+      <p class="muted">${t("Каждая звезда идёт и тому, кто её заработал, и в общую копилку. Дела, сделанные вдвоём, приносят в копилку двойные звёзды.")}</p></section>
     <section class="card"><h2>${t("Вклад за 7 дней")}</h2>
       <p class="muted">${t("Не соревнование, а общая картина: кто замечает, кто планирует, кто делает.")}</p>
       ${members.map(bar).join("")}
+      ${together ? `<div class="who"><div class="who-h"><b>👫 ${t("Вдвоём")}</b><span>${star(together)}</span></div>
+        <p class="meta">${t("Дела, сделанные вместе: двойные звёзды в общую копилку")}</p></div>` : ""}
       <p class="legend"><span><i class="b-notice"></i>${t("Заметить")}</span><span><i class="b-plan"></i>${t("Спланировать")}</span><span><i class="b-do"></i>${t("Сделать")}</span></p>
     </section>`;
 }
@@ -146,10 +161,17 @@ function settingsTab(S, ui) {
     <section class="card"><h2>${t("Экономика звёзд")}</h2>
       <p class="muted">${t("Сколько минут работы стоит одна звезда. Меняет цену будущих отметок, заработанное не пересчитывается.")}</p>
       ${seg("scale", [5, 10, 15, 20, 30].map(n => [n, t("{n} мин", { n })]), p.scale || 10)}</section>
+    <section class="card"><h2>${t("Помощь и документы")}</h2>
+      <button class="btn" data-act="help">${t("Справка и вопросы")}</button>
+      <button class="btn ghost" data-act="doc" data-v="privacy">${t("Политика конфиденциальности")}</button>
+      <button class="btn ghost" data-act="doc" data-v="terms">${t("Условия использования")}</button></section>
     <section class="card"><h2>${t("Пара")}</h2>
       ${(p.members || []).length < 2 ? `<button class="btn" data-act="new-invite">${t("Сменить код приглашения")}</button>` : ""}
       <button class="btn danger" data-act="leave">${t("Выйти из пары")}</button>
       <button class="btn ghost" data-act="signout">${t("Выйти из аккаунта")}</button></section>
+    <section class="card"><h2>${t("Аккаунт и данные")}</h2>
+      <p class="muted">${t("Удаляет ваш профиль, имя в паре и запись входа. Партнёр останется в паре.")}</p>
+      <button class="btn danger" data-act="delete-account">${t("Удалить аккаунт")}</button></section>
     <p class="muted center-text small">${t("Нора")} 0.1</p>`;
 }
 
@@ -182,12 +204,22 @@ function taskForm(S, ui) {
     ${d.id ? `<button class="btn danger ghost" data-act="delete-task" data-id="${esc(d.id)}">${t("Удалить дело")}</button>` : ""}`;
 }
 
-function packsSheet() {
-  return `<h2>${t("Готовые наборы")}</h2>
-    ${PACKS.map(p => `<div class="pack"><div><b>${p.icon} ${t(p.title)}</b>
-      <p class="meta">${p.tasks.map(r => esc(t(r[0]))).join(", ")}</p></div>
-      <button class="btn" data-act="add-pack" data-id="${p.id}">${t("Добавить")}</button></div>`).join("")}
-    <button class="btn ghost" data-act="close">${t("Закрыть")}</button>`;
+// Ready-made chores as a checklist: pick single chores; ones the pair already has are marked.
+function packsSheet(S, ui) {
+  const have = new Set(S.tasks.map(x => x.title.trim().toLowerCase()));
+  const picked = ui.sheet.picked;
+  const row = (p, r, i) => {
+    const id = p.id + ":" + i, title = t(r[0]), exists = have.has(title.toLowerCase()), on = picked.has(id);
+    const meta = [t("{n} мин", { n: r[1] }), t((REPEAT_LABELS.find(x => x[0] === r[3]) || REPEAT_LABELS[0])[1])].join(" · ");
+    return `<button class="pick ${on ? "on" : ""}" ${exists ? "disabled" : `data-act="pick" data-id="${id}"`} role="checkbox" aria-checked="${on}">
+      <span class="box">${on ? "✓" : ""}</span><span class="pick-t"><b>${esc(title)}</b><small>${exists ? t("Уже есть") : esc(meta)}</small></span></button>`;
+  };
+  return `<h2>${t("Готовые наборы")}</h2><p class="muted">${t("Отметьте дела, которые подходят вам.")}</p>
+    ${PACKS.map(p => `<div class="pack-h"><b>${p.icon} ${t(p.title)}</b>
+      <button class="btn ghost small-btn" data-act="pick-all" data-id="${p.id}">${t("Все")}</button></div>
+      ${p.tasks.map((r, i) => row(p, r, i)).join("")}`).join("")}
+    <div class="sheet-foot row"><button class="btn primary" data-act="add-picked" ${picked.size && !ui.busy ? "" : "disabled"}>${t("Добавить ({n})", { n: picked.size })}</button>
+    <button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
 }
 
 function confirmSheet(title, text, act, label, id) {
@@ -196,10 +228,34 @@ function confirmSheet(title, text, act, label, id) {
     <button class="btn ghost" data-act="close">${t("Отмена")}</button></div>`;
 }
 
+function docSheet(kind) {
+  const d = LEGAL[kind][getLang()] || LEGAL[kind].en;
+  return `<h2>${d.title}</h2><p class="muted small">${d.updated}</p>
+    <div class="doc">${d.sections.map(([h, body]) => `<h3>${h}</h3><div>${body}</div>`).join("")}</div>
+    <div class="sheet-foot row"><button class="btn" data-act="close">${t("Закрыть")}</button></div>`;
+}
+
+function helpSheet(ui) {
+  const h = HELP[getLang()] || HELP.en, tab = ui.sheet.tab || "guide";
+  return `<h2>${t("Справка")}</h2>
+    ${seg("help-tab", [["guide", "Как пользоваться"], ["faq", "Частые вопросы"]], tab)}
+    <div class="help">${h[tab].map(([q, a]) => `<details ${tab === "guide" ? "open" : ""}><summary>${esc(q)}</summary><p>${esc(a)}</p></details>`).join("")}</div>
+    <div class="sheet-foot row"><button class="btn" data-act="close">${t("Закрыть")}</button></div>`;
+}
+
+// Sheets that also open before sign-in: documents and help.
+export function overlay(S, ui) {
+  const k = ui.sheet && ui.sheet.type;
+  if (k !== "doc" && k !== "help") return "";
+  return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${k === "doc" ? docSheet(ui.sheet.v) : helpSheet(ui)}</div>`;
+}
+
 function sheet(S, ui) {
   const k = ui.sheet.type;
-  const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet()
+  if (k === "doc" || k === "help") return overlay(S, ui);
+  const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet(S, ui)
     : k === "undo" ? confirmSheet("Отменить отметку?", "Звёзды за этот этап вернутся.", "undo-yes", "Отменить отметку", ui.sheet.id)
+    : k === "delete" ? confirmSheet("Удалить аккаунт?", "Ваш профиль, имя в паре и запись входа будут удалены сразу, это нельзя отменить. Ваши отметки останутся в истории пары без имени. Для подтверждения нужно ещё раз войти через Google.", "delete-yes", "Удалить навсегда")
     : confirmSheet("Выйти из пары?", "Партнёр останется в паре и сможет пригласить вас снова по новому коду. Заработанные звёзды останутся в истории пары.", "leave-yes", "Выйти из пары");
   return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${inner}</div>`;
 }

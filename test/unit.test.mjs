@@ -31,6 +31,7 @@ test("a task shows which stages are claimed in the current period", () => {
   const task = { id: "t", minutes: 30, difficulty: 1, repeat: "daily", full: true };
   const v = taskView(task, logs([{ id: "t_notice_2026-10-28", uid: "a", stars: 1 }, { id: "t_do_2026-10-27", uid: "b", stars: 3 }]), 10, today);
   assert.deepEqual(v.stages.map(s => [s.stage, s.stars, !!s.mark]), [["notice", 1, true], ["plan", 2, false], ["do", 3, false]]);
+  assert.deepEqual(v.stages.map(s => s.together), [0, 0, 6]);
   assert.equal(v.done, false);
   assert.deepEqual(taskView({ ...task, full: false }, new Map(), 10, today).stages.map(s => s.stage), ["do"]);
 });
@@ -46,9 +47,9 @@ test("week stats split stars by stage and ignore old or pending marks", () => {
   const list = [
     { id: "t_notice_once", uid: "a", day: today, stars: 1 }, { id: "t_plan_once", uid: "a", day: "2026-10-22", stars: 2 },
     { id: "u_do_2026-10-28", uid: "b", day: today, stars: 3 }, { id: "u_do_2026-10-21", uid: "b", day: "2026-10-21", stars: 3 },
-    { id: "v_do_once", uid: "b", day: today }
+    { id: "v_do_once", uid: "b", day: today }, { id: "w_do_once", uid: "a", day: today, stars: 8, together: true }
   ];
-  assert.deepEqual(weekStats(list, ["a", "b"], today), { a: { notice: 1, plan: 2, do: 0, total: 3 }, b: { notice: 0, plan: 0, do: 3, total: 3 } });
+  assert.deepEqual(weekStats(list, ["a", "b"], today), { by: { a: { notice: 1, plan: 2, do: 0, total: 3 }, b: { notice: 0, plan: 0, do: 3, total: 3 } }, together: 8 });
 });
 
 test("invite codes and helpers", () => {

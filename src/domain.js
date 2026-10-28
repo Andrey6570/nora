@@ -1,5 +1,5 @@
 // What the screens show, derived from the pair, its tasks and its marks. No Firebase here.
-import { STAGES, stageStars, periodKey, logId, parseLogId, dayKey } from "../functions/economy.js";
+import { STAGES, stageStars, togetherStars, periodKey, logId, parseLogId, dayKey } from "../functions/economy.js";
 
 export { STAGES, dayKey };
 export const MINUTES = [5, 10, 15, 20, 30, 45, 60, 90, 120, 180];
@@ -39,7 +39,7 @@ export function taskView(task, logs, scale, today) {
   const period = periodKey(task, today);
   const stages = (task.full ? STAGES : ["do"]).map(stage => {
     const mark = logs.get(logId(task.id, stage, period)) || null;
-    return { stage, stars: stageStars(task, stage, scale), id: logId(task.id, stage, period), mark };
+    return { stage, stars: stageStars(task, stage, scale), together: stage === "do" ? togetherStars(task, scale) : 0, id: logId(task.id, stage, period), mark };
   });
   const done = !!(stages.find(s => s.stage === "do") || {}).mark;
   return { task, period, stages, done };
@@ -62,17 +62,21 @@ export function taskGroups(tasks, logs, scale, today) {
 }
 
 // Last 7 days (today included): stars per partner and per stage. It shows who notices and plans, not only who does.
+// Chores done together belong to both, so they are counted for the pair as a whole.
 export function weekStats(logList, members, today) {
   const days = new Set();
   const [y, m, d] = today.split("-").map(Number);
   for (let i = 0; i < 7; i++) days.add(dayKey(new Date(y, m - 1, d - i)));
   const by = Object.fromEntries(members.map(u => [u, { notice: 0, plan: 0, do: 0, total: 0 }]));
+  let together = 0;
   for (const l of logList) {
     const p = parseLogId(l.id);
-    if (!p || !days.has(l.day) || !by[l.uid] || !l.stars) continue;
+    if (!p || !days.has(l.day) || !l.stars) continue;
+    if (l.together) { together += l.stars; continue; }
+    if (!by[l.uid]) continue;
     by[l.uid][p.stage] += l.stars; by[l.uid].total += l.stars;
   }
-  return by;
+  return { by, together };
 }
 
 // Logs that matter for the screens: recent ones and every mark of a one-off task (those never repeat).

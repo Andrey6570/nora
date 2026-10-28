@@ -1,7 +1,7 @@
 // Server logic, kept free of Firebase triggers so it can be tested with fakes.
 // deps: { db, now } — an Admin Firestore instance (or a fake with the same surface) and the current time.
 import { FieldValue } from "firebase-admin/firestore";
-import { stageStars, parseLogId, periodKey } from "./economy.js";
+import { stageStars, togetherStars, parseLogId, periodKey } from "./economy.js";
 
 const inc = n => FieldValue.increment(n);
 
@@ -13,6 +13,7 @@ function nearToday(day, now) {
 }
 
 // A partner marked a stage: check it against the task and award the stars to them and to the shared pot.
+// A chore done together brings double stars, all into the shared pot and none to personal balances.
 export async function onLogCreated({ db, now = () => new Date() }, { pid, logId, data }) {
   const logRef = db.doc(`pairs/${pid}/log/${logId}`);
   const pairRef = db.doc(`pairs/${pid}`);
@@ -28,6 +29,13 @@ export async function onLogCreated({ db, now = () => new Date() }, { pid, logId,
     if (!task.exists) return reject("no-task");
     const t = task.data();
     if (periodKey(t, data.day || "") !== parsed.period) return reject("bad-period");
+    if (data.together) {
+      if (parsed.stage !== "do" || (p.members || []).length !== 2) return reject("bad-together");
+      const stars = togetherStars(t, p.scale);
+      tx.update(logRef, { stars });
+      tx.update(pairRef, { pot: inc(stars), xp: inc(stars) });
+      return stars;
+    }
     const stars = stageStars(t, parsed.stage, p.scale);
     if (!stars) return reject("bad-stage");
     tx.update(logRef, { stars });
@@ -43,7 +51,7 @@ export async function onLogDeleted({ db }, { pid, data }) {
   const pairRef = db.doc(`pairs/${pid}`);
   const pair = await pairRef.get();
   if (!pair.exists) return 0;
-  await pairRef.update({ [`balances.${data.uid}`]: inc(-stars), pot: inc(-stars), xp: inc(-stars) });
+  await pairRef.update(Object.assign({ pot: inc(-stars), xp: inc(-stars) }, data.together ? {} : { [`balances.${data.uid}`]: inc(-stars) }));
   return -stars;
 }
 

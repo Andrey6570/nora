@@ -2,7 +2,7 @@
 import test, { before, after, beforeEach } from "node:test";
 import { readFileSync } from "node:fs";
 import { initializeTestEnvironment, assertSucceeds, assertFails } from "@firebase/rules-unit-testing";
-import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayRemove } from "firebase/firestore";
+import { doc, setDoc, getDoc, updateDoc, deleteDoc, arrayRemove, deleteField } from "firebase/firestore";
 
 let env;
 const as = uid => env.authenticatedContext(uid).firestore();
@@ -45,6 +45,14 @@ test("members change settings but never stars, and only their own name", async (
   await assertFails(updateDoc(doc(as("x"), "pairs/p"), { scale: 15 }));
 });
 
+test("deleting an account removes only one's own name, then leaves", async () => {
+  await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "names.b": deleteField() }));
+  await assertSucceeds(updateDoc(doc(as("a"), "pairs/p"), { "names.a": deleteField() }));
+  await assertSucceeds(updateDoc(doc(as("a"), "pairs/p"), { members: arrayRemove("a") }));
+  await assertSucceeds(deleteDoc(doc(as("a"), "users/a")));
+});
+
 test("a partner leaves alone and cannot remove the other", async () => {
   await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
   await assertFails(updateDoc(doc(as("a"), "pairs/p"), { members: arrayRemove("b") }));
@@ -77,6 +85,8 @@ test("marks: own, without stars, claimed once, taken back only by the author", a
   await assertFails(setDoc(doc(as("b"), id), { uid: "b", day: "2026-10-28", at: 2 }));
   await assertFails(deleteDoc(doc(as("b"), id)));
   await assertSucceeds(deleteDoc(doc(as("a"), id)));
+  await assertSucceeds(setDoc(doc(as("b"), "pairs/p/log/u_do_once"), { uid: "b", day: "2026-10-28", at: 1, once: true, together: true }));
+  await assertFails(setDoc(doc(as("b"), "pairs/p/log/v_do_once"), { uid: "b", day: "2026-10-28", at: 1, together: "yes" }));
 });
 
 test("a profile is private", async () => {

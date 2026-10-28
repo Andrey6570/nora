@@ -5,6 +5,7 @@ export const STAGES = ["notice", "plan", "do"];
 export const DIFF_MULT = { 1: 1, 2: 1.5, 3: 2 };
 export const DEFAULT_SCALE = 10; // minutes of work per star
 export const REPEATS = ["once", "daily", "weekly"];
+export const TOGETHER_MULT = 2; // a chore done together brings double stars, all into the shared pot
 
 // Stars for the "do" stage: time over scale, weighted by difficulty, at least 1.
 export function baseStars(task, scale = DEFAULT_SCALE) {
@@ -22,6 +23,9 @@ export function stageStars(task, stage, scale) {
   if (stage === "plan") return Math.max(1, Math.round(b / 2));
   return b;
 }
+
+// "Done together" applies to the doing stage only.
+export function togetherStars(task, scale) { return stageStars(task, "do", scale) * TOGETHER_MULT; }
 
 // Local calendar day "YYYY-MM-DD".
 export function dayKey(d = new Date()) {

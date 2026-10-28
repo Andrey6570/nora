@@ -1,12 +1,13 @@
 name: Deploy Firebase (functions and rules)
 
-# Publishes the server functions (stars, clean-up) and the database rules to the project named in .firebaserc.
+# Publishes the server functions (stars, clean-up), the database rules and the public legal pages (hosting/)
+# to the project named in .firebaserc.
 # Needs the FIREBASE_SERVICE_ACCOUNT secret (see README). Run it by hand once, then it runs on changes.
 on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["functions/**", "firestore.rules", "firebase.json", ".firebaserc", ".github/workflows/deploy-firebase.yml"]
+    paths: ["functions/**", "firestore.rules", "firebase.json", ".firebaserc", "src/legal.js", "tools/build-legal.mjs", ".github/workflows/deploy-firebase.yml"]
 
 jobs:
   deploy:
@@ -59,7 +60,8 @@ jobs:
       - name: Deploy
         if: steps.secret.outputs.ok == 'true'
         run: |
-          deploy() { npx firebase deploy --only functions,firestore:rules --non-interactive --force 2>&1 | tee deploy.log; return ${PIPESTATUS[0]}; }
+          node tools/build-legal.mjs
+          deploy() { npx firebase deploy --only functions,firestore:rules,hosting --non-interactive --force 2>&1 | tee deploy.log; return ${PIPESTATUS[0]}; }
           deploy && CODE=0 || CODE=$?
           # a failed first deploy can leave a function without its trigger, which Firebase then refuses to update:
           # delete such functions and deploy once more

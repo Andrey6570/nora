@@ -78,8 +78,9 @@ service cloud.firestore {
         allow read: if isMember(pid);
         allow create: if isMember(pid)
           && request.resource.data.uid == me()
-          && request.resource.data.keys().hasOnly(['uid', 'day', 'at', 'once'])
-          && request.resource.data.day is string;
+          && request.resource.data.keys().hasOnly(['uid', 'day', 'at', 'once', 'together'])
+          && request.resource.data.day is string
+          && (!('together' in request.resource.data) || request.resource.data.together == true);
         allow update: if false;
         allow delete: if isMember(pid) && resource.data.uid == me();
       }

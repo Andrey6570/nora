@@ -77,6 +77,24 @@ test("invalid marks are removed and award nothing", async () => {
   }
 });
 
+test("a chore done together brings double stars, all into the pot", async () => {
+  const id = "t1_do_2026-10-28", data = { uid: "a", day: "2026-10-28", together: true };
+  const db = fakeDb({ "pairs/p": pair, "pairs/p/tasks/t1": { minutes: 30, difficulty: 1, repeat: "daily" }, [`pairs/p/log/${id}`]: data });
+  assert.equal(await onLogCreated({ db, now }, { pid: "p", logId: id, data }), 6);
+  assert.deepEqual([db.docs.get("pairs/p").balances.a, db.docs.get("pairs/p").pot], [undefined, 6]);
+  assert.equal(await onLogDeleted({ db }, { pid: "p", data: { ...data, stars: 6 } }), -6);
+  assert.deepEqual([db.docs.get("pairs/p").balances.a, db.docs.get("pairs/p").pot], [undefined, 0]);
+});
+
+test("together is only for the doing stage of a complete pair", async () => {
+  for (const [id, p] of [["t1_plan_once", pair], ["t1_do_once", { ...pair, members: ["a"] }]]) {
+    const data = { uid: "a", day: "2026-10-28", together: true };
+    const db = fakeDb({ "pairs/p": p, "pairs/p/tasks/t1": { minutes: 30, difficulty: 1, repeat: "once", full: true }, [`pairs/p/log/${id}`]: data });
+    assert.equal(await onLogCreated({ db, now }, { pid: "p", logId: id, data }), "bad-together");
+    assert.equal(db.docs.has(`pairs/p/log/${id}`), false);
+  }
+});
+
 test("taking a mark back returns its stars", async () => {
   const db = fakeDb({ "pairs/p": { ...pair, balances: { a: 5 }, pot: 7, xp: 7 } });
   assert.equal(await onLogDeleted({ db }, { pid: "p", data: { uid: "a", stars: 5 } }), -5);

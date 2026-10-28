@@ -1,7 +1,7 @@
 // In-memory store with the same surface as store.js. Opens with ?demo in a browser: lets you look at every
 // screen before Firebase is set up, and drives the layout smoke test. It awards stars the way the server does.
-import { stageStars, parseLogId, DEFAULT_SCALE } from "../functions/economy.js";
-import { newInviteCode, dayKey, PACKS, packTask, uid } from "./domain.js";
+import { stageStars, togetherStars, parseLogId, DEFAULT_SCALE } from "../functions/economy.js";
+import { newInviteCode, dayKey, uid } from "./domain.js";
 
 export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], error: "", demo: true };
 let notify = () => {};
@@ -27,6 +27,7 @@ function seed(stage) {
   ];
   const mark = (id, who, day) => award(id, { uid: who, day, at: now });
   mark("t1_do_" + today, PARTNER, today);
+  award("t2_do_" + today, { uid: PARTNER, day: today, at: now, together: true });
   mark("t2_do_" + dayKey(y), ME, dayKey(y));
   mark("t4_notice_once", PARTNER, dayKey(y));
   mark("t4_plan_once", PARTNER, today);
@@ -35,9 +36,9 @@ function seed(stage) {
 
 function award(id, data) {
   const p = parseLogId(id), task = M.tasks.find(t => t.id === p.taskId);
-  const stars = task ? stageStars(task, p.stage, M.pair.scale) : 0;
+  const stars = !task ? 0 : data.together ? togetherStars(task, M.pair.scale) : stageStars(task, p.stage, M.pair.scale);
   M.logs.set(id, Object.assign({ id, stars }, data));
-  M.pair.balances[data.uid] = (M.pair.balances[data.uid] || 0) + stars;
+  if (!data.together) M.pair.balances[data.uid] = (M.pair.balances[data.uid] || 0) + stars;
   M.pair.pot += stars; M.pair.xp += stars;
 }
 
@@ -62,6 +63,7 @@ export async function joinPair(code, name) {
   notify();
 }
 export async function newInvite() { M.pair.inviteCode = newInviteCode(); notify(); }
+export async function deleteAccount() { M.user = null; M.profile = null; M.pair = null; M.tasks = []; M.logs = new Map(); sync(); }
 export async function leavePair() { M.pair = null; M.tasks = []; M.logs = new Map(); M.profile.pairId = null; sync(); }
 export async function saveName(name) { M.pair.names[ME] = name; M.profile.name = name; notify(); }
 export async function saveScale(n) { M.pair.scale = n; notify(); }
@@ -72,16 +74,17 @@ export async function saveTask(t) {
   notify();
 }
 export async function deleteTask(id) { M.tasks = M.tasks.filter(t => t.id !== id); notify(); }
-export async function addPack(packId, tr) {
-  PACKS.find(p => p.id === packId).tasks.forEach((row, i) => { const t = packTask(row); M.tasks.push(Object.assign(t, { id: uid(), title: tr(t.title), createdAt: Date.now() + i })); });
+export async function addTasks(tasks) {
+  tasks.forEach((t, i) => M.tasks.push(Object.assign({}, t, { id: uid(), createdAt: Date.now() + i })));
   notify();
 }
-export async function claim(view, stage) {
+export async function claim(view, stage, together) {
   if (M.logs.has(stage.id)) throw { code: "already-exists" };
-  award(stage.id, { uid: ME, day: dayKey(), at: Date.now() }); sync();
+  award(stage.id, Object.assign({ uid: ME, day: dayKey(), at: Date.now() }, together ? { together: true } : {})); sync();
 }
 export async function unclaim(id) {
   const l = M.logs.get(id); if (!l) return;
   M.logs.delete(id);
-  M.pair.balances[l.uid] -= l.stars; M.pair.pot -= l.stars; M.pair.xp -= l.stars; sync();
+  if (!l.together) M.pair.balances[l.uid] -= l.stars;
+  M.pair.pot -= l.stars; M.pair.xp -= l.stars; sync();
 }
