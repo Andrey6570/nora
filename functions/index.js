@@ -7,8 +7,9 @@ import * as h from "./handlers.js";
 initializeApp();
 const deps = { db: getFirestore() };
 
-// Firestore triggers must run where the database lives: the multi-region eur3 (Europe).
-const region = "eur3";
+// The database lives in the multi-region eur3, but functions need a single region: europe-west1 is part of eur3.
+// The Firestore triggers themselves are placed in eur3 automatically.
+const region = "europe-west1";
 const LOG = "pairs/{pid}/log/{logId}", PAIR = "pairs/{pid}";
 
 export const logCreated = onDocumentCreated({ document: LOG, region }, e => h.onLogCreated(deps, { pid: e.params.pid, logId: e.params.logId, data: e.data && e.data.data() }));
