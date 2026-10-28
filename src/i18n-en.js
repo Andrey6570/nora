@@ -1,7 +1,9 @@
 // English. Keys are the Russian source strings (see tools/ru-strings.mjs).
 export const EN = {
   "Нора": "Nora",
-  "Firebase ещё не подключён. Заполните src/config.js по инструкции в README или откройте демо: добавьте ?demo к адресу.": "Firebase is not connected yet. Fill in src/config.js as the README explains, or open the demo by adding ?demo to the address.",
+  "Сервер ещё не подключён, поэтому войти пока нельзя. Демо показывает все экраны на примерных данных, ничего не сохраняется.": "The server is not connected yet, so you cannot sign in. The demo shows every screen with sample data; nothing is saved.",
+  "Посмотреть демо": "Try the demo",
+  "Демо": "Demo",
   "Дом — общее дело. Игра для двоих о быте и заботе друг о друге.": "A home is a shared job. A game for two about chores and caring for each other.",
   "Войти через Google": "Sign in with Google",
   "Добро пожаловать": "Welcome",

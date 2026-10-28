@@ -86,6 +86,7 @@ const findView = id => {
 };
 
 const actions = {
+  demo: () => { location.search = "?demo"; },
   signin: () => run(() => store.signIn()),
   signout: () => run(async () => { ui.sheet = null; ui.tab = "tasks"; await store.signOutAll(); }),
   welcome: el => { ui.welcome = el.dataset.v; ui.err = ""; render(); },

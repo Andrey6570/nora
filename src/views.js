@@ -11,8 +11,10 @@ const seg = (name, items, cur) => `<div class="seg" role="radiogroup">${items.ma
 const langChips = () => seg("lang", LANGS.map(([v, l]) => [v, l]), getLang());
 
 export function setup() {
-  return `<main class="center"><div class="logo">🦊</div><h1>${t("Нора")}</h1>
-    <p class="muted">${t("Firebase ещё не подключён. Заполните src/config.js по инструкции в README или откройте демо: добавьте ?demo к адресу.")}</p></main>`;
+  return `<main class="center narrow"><div class="logo">🦊</div><h1>${t("Нора")}</h1>
+    <p class="lead">${t("Сервер ещё не подключён, поэтому войти пока нельзя. Демо показывает все экраны на примерных данных, ничего не сохраняется.")}</p>
+    <button class="btn primary big" data-act="demo">${t("Посмотреть демо")}</button>
+    <div class="foot">${langChips()}</div></main>`;
 }
 
 export function loading() { return `<main class="center"><div class="logo pulse">🦊</div></main>`; }
@@ -155,7 +157,7 @@ const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["settings"
 
 export function main(S, ui) {
   const body = ui.tab === "us" ? usTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
-  return `<header class="top"><b>${t("Нора")}</b></header>
+  return `<header class="top"><b>${t("Нора")}</b>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
     <main class="page">${body}${err(ui)}</main>
     <nav class="tabs">${TABS.map(([id, icon, label]) =>
       `<button class="${ui.tab === id ? "on" : ""}" data-act="tab" data-v="${id}" aria-current="${ui.tab === id}"><span>${icon}</span>${t(label)}</button>`).join("")}</nav>
