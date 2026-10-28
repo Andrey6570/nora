@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ["functions/**", "firestore.rules", "firebase.json", ".firebaserc"]
+    paths: ["functions/**", "firestore.rules", "firebase.json", ".firebaserc", ".github/workflows/deploy-firebase.yml"]
 
 jobs:
   deploy:
@@ -43,6 +43,11 @@ jobs:
         if: steps.secret.outputs.ok == 'true'
         with:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+
+      # firebase deploy checks the billing plan through this API but does not enable it itself
+      - name: Enable the Cloud Billing API
+        if: steps.secret.outputs.ok == 'true'
+        run: gcloud services enable cloudbilling.googleapis.com --project "$(node -p 'require("./.firebaserc").projects.default')"
 
       - name: Deploy
         if: steps.secret.outputs.ok == 'true'
