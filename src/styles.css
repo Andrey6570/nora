@@ -200,3 +200,13 @@ button, input, select { font: inherit; color: inherit; }
 .react:disabled { opacity: .5; }
 .stage.theirs { cursor: pointer; }
 .stage .rx { margin-left: 2px; }
+
+/* shop */
+.sub { font-size: 15px; margin: 14px 0 2px; }
+.orders { list-style: none; margin: 4px 0 0; padding: 0; }
+.order { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.order > div:first-child { display: flex; flex-direction: column; flex: 1 1 150px; min-width: 0; overflow-wrap: anywhere; }
+.order small { color: var(--muted); font-size: 13px; }
+.order-btns { display: flex; gap: 4px; align-items: center; flex: none; flex-wrap: wrap; justify-content: flex-end; }
+.order .btn { min-height: 40px; padding: 6px 12px; }
+.shop .btn { align-self: auto; }

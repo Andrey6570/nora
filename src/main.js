@@ -2,7 +2,7 @@ import "./styles.css";
 import { t, getLang, setLang } from "./i18n.js";
 import * as V from "./views.js";
 import { configured } from "./fb.js";
-import { taskView, dayKey, PACKS, packTask } from "./domain.js";
+import { taskView, dayKey, PACKS, packTask, REWARD_PACKS, rewardRow } from "./domain.js";
 
 const demo = new URLSearchParams(location.search).has("demo");
 const store = demo ? await import("./demo.js") : configured ? await import("./store.js") : null;
@@ -11,6 +11,7 @@ const S = store && store.M;
 const $ = s => document.querySelector(s);
 const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 const THEME_KEY = "nora-theme", SEEN_KEY = "nora-seen-signals";
+const NEW_REWARD = () => ({ title: "", cost: 20, scope: "personal" });
 const NEW_TASK = () => ({ title: "", minutes: 15, difficulty: 1, repeat: "once", full: true });
 
 const ui = { seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
@@ -26,6 +27,8 @@ function errText(e) {
   if (/need-title/.test(c)) return t("Напишите, что нужно сделать");
   if (/other-account/.test(c)) return t("Для удаления войдите в тот же аккаунт Google.");
   if (/limit/.test(c)) return t("Лимит на сегодня исчерпан.");
+  if (/not-enough/.test(c)) return t("Не хватает звёзд.");
+  if (/bad-cost/.test(c)) return t("Цена от 1 до 9999 звёзд.");
   if (/already-exists|permission-denied/.test(c)) return t("Этот этап уже отметили. Обновите экран.");
   if (/network|unavailable/.test(c)) return t("Нет связи с интернетом");
   return t("Не получилось") + (c ? " (" + c + ")" : "");
@@ -78,7 +81,7 @@ function setField(name, value) {
 }
 document.addEventListener("input", e => {
   const f = e.target.dataset.field; if (!f) return;
-  const v = e.target.type === "checkbox" ? e.target.checked : e.target.tagName === "SELECT" ? Number(e.target.value) : e.target.value;
+  const v = e.target.type === "checkbox" ? e.target.checked : e.target.tagName === "SELECT" || e.target.type === "number" ? Number(e.target.value) : e.target.value;
   setField(f, v);
   // the star preview depends on these
   if (e.target.type === "checkbox" || e.target.tagName === "SELECT") render();
@@ -120,7 +123,7 @@ const actions = {
     if (name === "theme") { ui.theme = v; LS.set(THEME_KEY, v); applyTheme(); render(); return; }
     if (name === "scale") { run(() => store.saveScale(Number(v)), "Сохранено"); return; }
     if (name === "help-tab") { ui.sheet.tab = v; render(); return; }
-    setField(name, name === "d.repeat" ? v : Number(v));
+    setField(name, name === "d.repeat" || name === "d.scope" ? v : Number(v));
     render();
   },
   "copy-code": async () => {
@@ -144,6 +147,28 @@ const actions = {
   }, "Сохранено"),
   "delete-task": el => run(async () => { await store.deleteTask(el.dataset.id); ui.sheet = null; }, "Дело удалено"),
   packs: () => { ui.err = ""; ui.sheet = { type: "packs", picked: new Set() }; render(); },
+  "new-reward": () => { ui.err = ""; ui.sheet = { type: "reward", draft: NEW_REWARD() }; render(); },
+  "edit-reward": el => { const r = S.rewards.find(x => x.id === el.dataset.id); if (r) { ui.err = ""; ui.sheet = { type: "reward", draft: Object.assign({}, r) }; render(); } },
+  "save-reward": () => run(async () => {
+    const d = ui.sheet.draft;
+    if (!d.title.trim()) throw { code: "need-title" };
+    if (!Number.isInteger(d.cost) || d.cost < 1 || d.cost > 9999) throw { code: "bad-cost" };
+    await store.saveReward(d); ui.sheet = null;
+  }, "Сохранено"),
+  "delete-reward": el => run(async () => { await store.deleteReward(el.dataset.id); ui.sheet = null; }, "Награда удалена"),
+  "reward-packs": () => { ui.err = ""; ui.sheet = { type: "rewardpacks", picked: new Set() }; render(); },
+  "add-picked-rewards": () => run(async () => {
+    const list = [...ui.sheet.picked].map(id => {
+      const [packId, i] = id.split(":"), r = rewardRow(REWARD_PACKS.find(p => p.id === packId).rewards[Number(i)]);
+      return Object.assign(r, { title: t(r.title) });
+    });
+    await store.addRewards(list); ui.sheet = null;
+  }, "Награды добавлены"),
+  buy: el => { ui.err = ""; ui.sheet = { type: "buy", id: el.dataset.id }; render(); },
+  "buy-yes": el => run(async () => { await store.placeOrder("reward", el.dataset.id); ui.sheet = null; }, "Готово"),
+  "approve-order": el => run(() => store.approveOrder(el.dataset.id), "Согласие отправлено"),
+  "cancel-order": el => run(() => store.cancelOrder(el.dataset.id)),
+  "use-order": el => run(() => store.markUsed(el.dataset.id), "Отмечено"),
   pick: el => { const p = ui.sheet.picked, id = el.dataset.id; p.has(id) ? p.delete(id) : p.add(id); render(); },
   "pick-all": el => {
     const have = new Set(S.tasks.map(x => x.title.trim().toLowerCase()));

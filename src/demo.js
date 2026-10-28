@@ -4,7 +4,7 @@ import { stageStars, togetherStars, parseLogId, DEFAULT_SCALE } from "../functio
 import { newInviteCode, dayKey, uid } from "./domain.js";
 import { isKnown, LIMITS } from "../functions/signals.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], error: "", demo: true };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], error: "", demo: true };
 let notify = () => {};
 const ME = "me", PARTNER = "partner";
 const sync = () => { M.logList = [...M.logs.values()]; notify(); };
@@ -34,6 +34,15 @@ function seed(stage) {
   mark("t4_plan_once", PARTNER, today);
   mark("t5_notice_once", ME, today);
   M.pair.sigDay = { [ME]: { day: today, message: 1, reaction: 0 } };
+  M.pair.games = {};
+  M.rewards = [
+    { id: "r1", title: "Сплю до 10 утра", cost: 10, scope: "personal" }, { id: "r2", title: "Я выбираю фильм", cost: 5, scope: "personal" },
+    { id: "r3", title: "Ужин вдвоём вне дома", cost: 40, scope: "joint" }, { id: "r4", title: "Кино вдвоём", cost: 20, scope: "joint" }
+  ];
+  M.orders = [
+    { id: "o1", uid: PARTNER, kind: "reward", ref: "r4", status: "proposed", cost: 20, title: "Кино вдвоём", joint: true, at: now - 1800e3 },
+    { id: "o2", uid: ME, kind: "reward", ref: "r2", status: "bought", cost: 5, title: "Я выбираю фильм", joint: false, at: now - 86400e3 }
+  ];
   M.signals = [
     { id: "s1", from: PARTNER, kind: "message", key: "thanks_dinner", day: today, at: now - 3600e3 },
     { id: "s2", from: PARTNER, kind: "reaction", key: "heart", ref: "t2_do_" + dayKey(y), day: today, at: now - 3000e3 },
@@ -95,6 +104,33 @@ export async function sendSignal(kind, key, ref) {
   M.signals = [{ id: uid(), from: ME, kind, key, day: today, at: Date.now(), ...(ref ? { ref } : {}) }, ...M.signals];
   notify();
 }
+// The shop, with the server's rules: personal at once from one's balance, joint proposed and spent on agreement.
+export async function saveReward(r) {
+  const f = { title: r.title.trim(), cost: r.cost, scope: r.scope };
+  if (r.id) Object.assign(M.rewards.find(x => x.id === r.id), f); else M.rewards.push(Object.assign(f, { id: uid() }));
+  notify();
+}
+export async function deleteReward(id) { M.rewards = M.rewards.filter(r => r.id !== id); notify(); }
+export async function addRewards(list) { list.forEach(r => M.rewards.push({ id: uid(), title: r.title, cost: r.cost, scope: r.scope })); notify(); }
+export async function placeOrder(kind, ref) {
+  const r = M.rewards.find(x => x.id === ref); if (!r) return;
+  const o = { id: uid(), uid: ME, kind, ref, at: Date.now(), cost: r.cost, title: r.title };
+  if (r.scope === "joint") {
+    if ((M.pair.pot || 0) < r.cost) throw { code: "not-enough" };
+    M.orders.push(Object.assign(o, { status: "proposed", joint: true }));
+  } else {
+    if ((M.pair.balances[ME] || 0) < r.cost) throw { code: "not-enough" };
+    M.pair.balances[ME] -= r.cost; M.orders.push(Object.assign(o, { status: "bought", joint: false }));
+  }
+  notify();
+}
+export async function approveOrder(id) {
+  const o = M.orders.find(x => x.id === id); if (!o || o.uid === ME) return;
+  if ((M.pair.pot || 0) < o.cost) { M.orders = M.orders.filter(x => x.id !== id); notify(); throw { code: "not-enough" }; }
+  M.pair.pot -= o.cost; o.status = "bought"; notify();
+}
+export async function cancelOrder(id) { M.orders = M.orders.filter(o => o.id !== id); notify(); }
+export async function markUsed(id) { const o = M.orders.find(x => x.id === id); if (o) o.used = true; notify(); }
 export async function registerDevice() { return false; }
 export async function setDeviceLang() {}
 export async function claim(view, stage, together) {

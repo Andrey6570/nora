@@ -40,3 +40,11 @@ export function pushText(kind, key, lang, taskTitle) {
   const q = taskTitle.length > 40 ? taskTitle.slice(0, 40) + "…" : taskTitle;
   return emoji + " " + { ru: `Реакция на «${q}»`, en: `Reaction to “${q}”`, el: `Αντίδραση στο «${q}»` }[lang];
 }
+
+// Push text for the shop. title is the reward or game as the pair named it.
+const SHOP = {
+  personal: { ru: t => `Награда: «${t}»`, en: t => `Reward: “${t}”`, el: t => `Ανταμοιβή: «${t}»` },
+  proposed: { ru: (t, n) => `Предлагает потратить копилку: «${t}» · ${n} ★`, en: (t, n) => `Suggests spending the pot: “${t}” · ${n} ★`, el: (t, n) => `Προτείνει να ξοδέψετε τον κουμπαρά: «${t}» · ${n} ★` },
+  approved: { ru: t => `Согласие получено: «${t}»`, en: t => `Agreed: “${t}”`, el: t => `Συμφωνία: «${t}»` }
+};
+export const shopText = (kind, lang, title, cost) => SHOP[kind][lang](title.length > 50 ? title.slice(0, 50) + "…" : title, cost);

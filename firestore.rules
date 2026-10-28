@@ -73,6 +73,37 @@ service cloud.firestore {
           && request.resource.data.full is bool;
       }
 
+      // rewards the pair chose: scope "personal" is bought from one's own stars, "joint" from the pot together
+      match /rewards/{id} {
+        allow read, delete: if isMember(pid);
+        allow create, update: if isMember(pid)
+          && request.resource.data.keys().hasOnly(['title', 'cost', 'scope', 'createdBy', 'createdAt'])
+          && request.resource.data.title is string && request.resource.data.title.size() > 0 && request.resource.data.title.size() <= 80
+          && request.resource.data.cost is int && request.resource.data.cost >= 1 && request.resource.data.cost <= 9999
+          && request.resource.data.scope in ['personal', 'joint'];
+      }
+
+      // purchases: the app asks, the server prices, charges and sets the status
+      match /orders/{id} {
+        allow read: if isMember(pid);
+        allow create: if isMember(pid)
+          && request.resource.data.uid == me()
+          && request.resource.data.keys().hasOnly(['uid', 'kind', 'ref', 'at'])
+          && request.resource.data.kind in ['reward', 'game']
+          && request.resource.data.ref is string && request.resource.data.ref.size() <= 40;
+        // the partner agrees to a proposal; either partner marks a bought reward as used
+        allow update: if isMember(pid) && (
+          (resource.data.status == 'proposed' && resource.data.uid != me()
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvedBy'])
+            && request.resource.data.approvedBy == me())
+          ||
+          (resource.data.status == 'bought' && resource.data.kind == 'reward'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['used'])
+            && request.resource.data.used == true));
+        // a proposal can be withdrawn by its author or declined by the partner
+        allow delete: if isMember(pid) && resource.data.status == 'proposed';
+      }
+
       // reactions and warm signals: the server checks them, applies the daily limit and sends the push
       match /signals/{id} {
         allow read: if isMember(pid);

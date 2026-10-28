@@ -104,3 +104,29 @@ export function reactionsByRef(signals) {
 export function unseenSignals(signals, uid, seenAt) {
   return signals.filter(s => s.from !== uid && s.kind === "message" && (s.at || 0) > seenAt).length;
 }
+
+// ---- the shop ----
+export const SCOPES = [["personal", "Из моих звёзд"], ["joint", "Из копилки, вдвоём"]];
+// Ready-made rewards: [title, cost in stars, scope]. Costs follow the default 1 star = 10 minutes.
+export const REWARD_PACKS = [
+  { id: "personal", title: "Для себя", icon: "🧘", rewards: [
+    ["Два часа свободного времени", 15, "personal"], ["Сплю до 10 утра", 10, "personal"], ["Вечер с друзьями", 25, "personal"],
+    ["Я выбираю фильм", 5, "personal"], ["Дело на выбор делает партнёр", 12, "personal"], ["Завтрак в постель", 15, "personal"]] },
+  { id: "joint", title: "Для двоих", icon: "💞", rewards: [
+    ["Ужин вдвоём вне дома", 40, "joint"], ["Кино вдвоём", 20, "joint"], ["Выходной без домашних дел", 60, "joint"],
+    ["Спа или массаж на двоих", 50, "joint"], ["Пикник", 25, "joint"], ["Вечер настольных игр", 10, "joint"]] }
+];
+export const rewardRow = ([title, cost, scope]) => ({ title, cost, scope });
+
+// What the shop shows: waiting proposals, the catalogue, unused purchases.
+export function shopView(pair, me, rewards, orders) {
+  const bal = (pair.balances && pair.balances[me]) || 0, pot = pair.pot || 0;
+  const proposals = orders.filter(o => o.status === "proposed" || (!o.status && o.joint !== false)).sort((a, b) => (b.at || 0) - (a.at || 0));
+  const bought = orders.filter(o => o.status === "bought").sort((a, b) => (b.at || 0) - (a.at || 0));
+  const canBuy = r => r.scope === "joint" ? pot >= r.cost : bal >= r.cost;
+  const byTitle = (a, b) => a.cost - b.cost || a.title.localeCompare(b.title);
+  return {
+    proposals, bought, unused: bought.filter(o => o.kind === "reward" && !o.used), canBuy,
+    personal: rewards.filter(r => r.scope === "personal").sort(byTitle), joint: rewards.filter(r => r.scope === "joint").sort(byTitle)
+  };
+}

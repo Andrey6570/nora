@@ -1,6 +1,7 @@
 // Screens as HTML strings. Buttons carry data-act (and data-id) for the click handler in main.js.
 import { t, LANGS, getLang } from "./i18n.js";
-import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, taskGroups, weekStats, dayKey, signalsLeft, reactionsByRef, unseenSignals } from "./domain.js";
+import { MINUTES, DIFFS, REPEAT_LABELS, STAGE_LABELS, STAGE_ICONS, PACKS, SCOPES, REWARD_PACKS, taskGroups, weekStats, dayKey, signalsLeft, reactionsByRef, unseenSignals, shopView } from "./domain.js";
+import { gameName } from "../functions/games.js";
 import { REACTIONS, MESSAGES, messageText } from "../functions/signals.js";
 import { stageStars } from "../functions/economy.js";
 import { LEGAL } from "./legal.js";
@@ -132,6 +133,37 @@ function tasksTab(S) {
     ${empty ? "" : `<button class="fab" data-act="new-task" aria-label="${t("Добавить дело")}">＋</button>`}`;
 }
 
+const orderTitle = o => o.kind === "game" ? gameName(o.ref, getLang()) : o.title;
+
+// Rewards: personal ones are bought from one's own stars at once, joint ones are proposed and spent from the pot when the partner agrees.
+function shopSection(S) {
+  const p = S.pair, me = S.user.uid, other = partnerOf(p, me), v = shopView(p, me, S.rewards || [], S.orders || []);
+  const proposal = o => {
+    const mine = o.uid === me;
+    return `<li class="order"><div><b>${esc(orderTitle(o))}</b>
+      <small>${mine ? t("Ждёт согласия: {name}", { name: esc(nameOf(p, other)) }) : t("{name} предлагает потратить копилку", { name: esc(nameOf(p, o.uid)) })} · ★${o.cost}</small></div>
+      <div class="order-btns">${mine ? `<button class="btn" data-act="cancel-order" data-id="${esc(o.id)}">${t("Отозвать")}</button>`
+        : `<button class="btn primary" data-act="approve-order" data-id="${esc(o.id)}" ${(p.pot || 0) >= o.cost ? "" : "disabled"}>${t("Согласен")}</button>
+           <button class="btn ghost" data-act="cancel-order" data-id="${esc(o.id)}">${t("Отклонить")}</button>`}</div></li>`;
+  };
+  const reward = r => `<li class="order"><div><b>${esc(r.title)}</b></div>
+    <div class="order-btns"><button class="btn" data-act="buy" data-id="${esc(r.id)}" ${v.canBuy(r) ? "" : "disabled"}>${r.scope === "joint" ? t("Предложить") : t("Купить")} <span class="star">★</span>${r.cost}</button>
+    <button class="icon" data-act="edit-reward" data-id="${esc(r.id)}" aria-label="${t("Изменить")}">⋯</button></div></li>`;
+  const group = (title, hint, list) => list.length ? `<h3 class="sub">${t(title)}</h3><p class="muted small">${t(hint)}</p><ul class="orders">${list.map(reward).join("")}</ul>` : "";
+  const unused = o => `<li class="order"><div><b>${esc(orderTitle(o))}</b><small>${esc(nameOf(p, o.uid))} · ★${o.cost}</small></div>
+    <div class="order-btns"><button class="btn" data-act="use-order" data-id="${esc(o.id)}">${t("Использовано")}</button></div></li>`;
+  return `<section class="card shop"><h2>${t("Награды")}</h2>
+    <p class="muted">${t("Звёзды можно потратить: свои на личное время, копилку на совместное, с согласия партнёра.")}</p>
+    ${v.proposals.length ? `<h3 class="sub">${t("Ждут согласия")}</h3><ul class="orders">${v.proposals.map(proposal).join("")}</ul>` : ""}
+    ${v.unused.length ? `<h3 class="sub">${t("Куплено, ещё не использовано")}</h3><ul class="orders">${v.unused.map(unused).join("")}</ul>` : ""}
+    ${group("Из моих звёзд", "Личное время: баланс вычитается сразу, партнёр получает уведомление.", v.personal)}
+    ${group("Из копилки, вдвоём", "Звёзды копилки уйдут, когда партнёр согласится.", v.joint)}
+    ${!(S.rewards || []).length ? `<p class="muted">${t("Наград пока нет. Добавьте свои или возьмите готовые.")}</p>` : ""}
+    <div class="row"><button class="btn" data-act="new-reward">${t("Добавить награду")}</button>
+    <button class="btn" data-act="reward-packs">${t("Готовые награды")}</button></div>
+  </section>`;
+}
+
 function usTab(S) {
   const p = S.pair, me = S.user.uid, members = p.members || [];
   const { by: stats, together } = weekStats(S.logList, members, dayKey());
@@ -147,6 +179,7 @@ function usTab(S) {
       <h2>${members.map(u => esc(nameOf(p, u))).join(" & ")}</h2></section>`}
     <section class="card pot"><span class="muted">${t("Общая копилка")}</span><div class="big-num">${star(p.pot || 0)}</div>
       <p class="muted">${t("Каждая звезда идёт и тому, кто её заработал, и в общую копилку. Дела, сделанные вдвоём, приносят в копилку двойные звёзды.")}</p></section>
+    ${members.length === 2 ? shopSection(S) : ""}
     <section class="card"><h2>${t("Вклад за 7 дней")}</h2>
       <p class="muted">${t("Не соревнование, а общая картина: кто замечает, кто планирует, кто делает.")}</p>
       ${members.map(bar).join("")}
@@ -247,6 +280,32 @@ function taskForm(S, ui) {
 }
 
 // Ready-made chores as a checklist: pick single chores; ones the pair already has are marked.
+function rewardForm(S, ui) {
+  const d = ui.sheet.draft;
+  return `<h2>${d.id ? t("Изменить награду") : t("Новая награда")}</h2>
+    <label class="field"><span>${t("Что получаем")}</span><input data-field="d.title" maxlength="80" value="${esc(d.title)}" placeholder="${t("Например, вечер без домашних дел")}"></label>
+    <label class="field"><span>${t("Цена в звёздах")}</span><input data-field="d.cost" type="number" inputmode="numeric" min="1" max="9999" value="${esc(d.cost)}"></label>
+    <div class="field"><span>${t("Откуда звёзды")}</span>${seg("d.scope", SCOPES, d.scope)}</div>
+    <p class="muted small">${d.scope === "joint" ? t("Копилка тратится вдвоём: партнёр должен согласиться.") : t("Тратятся ваши личные звёзды, партнёр получит уведомление.")}</p>
+    ${err(ui)}
+    <div class="row"><button class="btn primary" data-act="save-reward" ${ui.busy ? "disabled" : ""}>${t("Сохранить")}</button>
+    <button class="btn ghost" data-act="close">${t("Отмена")}</button></div>
+    ${d.id ? `<button class="btn danger ghost" data-act="delete-reward" data-id="${esc(d.id)}">${t("Удалить награду")}</button>` : ""}`;
+}
+
+function rewardPacksSheet(S, ui) {
+  const have = new Set((S.rewards || []).map(x => x.title.trim().toLowerCase())), picked = ui.sheet.picked;
+  const row = (p, r, i) => {
+    const id = p.id + ":" + i, title = t(r[0]), exists = have.has(title.toLowerCase()), on = picked.has(id);
+    return `<button class="pick ${on ? "on" : ""}" ${exists ? "disabled" : `data-act="pick" data-id="${id}"`} role="checkbox" aria-checked="${on}">
+      <span class="box">${on ? "✓" : ""}</span><span class="pick-t"><b>${esc(title)}</b><small>${exists ? t("Уже есть") : `★${r[1]}`}</small></span></button>`;
+  };
+  return `<h2>${t("Готовые награды")}</h2><p class="muted">${t("Отметьте награды, которые подходят вам. Цену потом можно поменять.")}</p>
+    ${REWARD_PACKS.map(p => `<div class="pack-h"><b>${p.icon} ${t(p.title)}</b></div>${p.rewards.map((r, i) => row(p, r, i)).join("")}`).join("")}
+    <div class="sheet-foot row"><button class="btn primary" data-act="add-picked-rewards" ${picked.size && !ui.busy ? "" : "disabled"}>${t("Добавить ({n})", { n: picked.size })}</button>
+    <button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
+}
+
 function packsSheet(S, ui) {
   const have = new Set(S.tasks.map(x => x.title.trim().toLowerCase()));
   const picked = ui.sheet.picked;
@@ -264,9 +323,9 @@ function packsSheet(S, ui) {
     <button class="btn ghost" data-act="close">${t("Закрыть")}</button></div>`;
 }
 
-function confirmSheet(title, text, act, label, id) {
-  return `<h2>${t(title)}</h2><p class="muted">${t(text)}</p>
-    <div class="row"><button class="btn danger" data-act="${act}" ${id ? `data-id="${esc(id)}"` : ""}>${t(label)}</button>
+function confirmSheet(title, text, act, label, id, plain) {
+  return `<h2>${t(title)}</h2><p class="muted">${plain ? text : t(text)}</p>
+    <div class="row"><button class="btn ${plain ? "primary" : "danger"}" data-act="${act}" ${id ? `data-id="${esc(id)}"` : ""}>${t(label)}</button>
     <button class="btn ghost" data-act="close">${t("Отмена")}</button></div>`;
 }
 
@@ -305,7 +364,12 @@ function sheet(S, ui) {
   const k = ui.sheet.type;
   if (k === "doc" || k === "help") return overlay(S, ui);
   if (k === "react") return `<div class="scrim" data-act="close"></div><div class="sheet" role="dialog" aria-modal="true">${reactSheet(S, ui)}</div>`;
+  const buying = k === "buy" && (S.rewards || []).find(r => r.id === ui.sheet.id);
   const inner = k === "task" ? taskForm(S, ui) : k === "packs" ? packsSheet(S, ui)
+    : k === "reward" ? rewardForm(S, ui) : k === "rewardpacks" ? rewardPacksSheet(S, ui)
+    : k === "buy" ? (buying ? confirmSheet(buying.scope === "joint" ? "Предложить партнёру?" : "Купить награду?",
+        buying.scope === "joint" ? t("«{x}» за {n} ★ из копилки. Звёзды уйдут, когда партнёр согласится.", { x: buying.title, n: buying.cost }) : t("«{x}» за {n} ★ из ваших звёзд. Они спишутся сразу.", { x: buying.title, n: buying.cost }),
+        "buy-yes", buying.scope === "joint" ? "Предложить" : "Купить", buying.id, true) : confirmSheet("Награда не найдена", "Обновите экран.", "close", "Закрыть"))
     : k === "undo" ? confirmSheet("Отменить отметку?", "Звёзды за этот этап вернутся.", "undo-yes", "Отменить отметку", ui.sheet.id)
     : k === "delete" ? confirmSheet("Удалить аккаунт?", "Ваш профиль, имя в паре и запись входа будут удалены сразу, это нельзя отменить. Ваши отметки останутся в истории пары без имени. Для подтверждения нужно ещё раз войти через Google.", "delete-yes", "Удалить навсегда")
     : confirmSheet("Выйти из пары?", "Партнёр останется в паре и сможет пригласить вас снова по новому коду. Заработанные звёзды останутся в истории пары.", "leave-yes", "Выйти из пары");

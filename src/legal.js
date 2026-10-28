@@ -15,6 +15,7 @@ export const LEGAL = {
         <li><b>Учётная запись Google:</b> идентификатор, адрес почты и имя из профиля Google. Их хранит сервис входа Firebase Authentication.</li>
         <li><b>Имя в приложении,</b> которое вы указали сами.</li>
         <li><b>Данные пары:</b> код приглашения, дела (название, время, сложность, повтор), отметки этапов с датой и временем, звёзды и общая копилка.</li>
+        <li><b>Награды:</b> названия и цены наград, которые вы добавили, и ваши покупки с датой.</li>
         <li><b>Реакции и тёплые слова,</b> которые вы отправляете партнёру: какая именно, когда и к какому делу.</li>
         <li><b>Данные для уведомлений</b> (только в приложении для Android и только если вы разрешили уведомления): токен вашего устройства и язык интерфейса.</li>
         <li><b>Настройки:</b> язык, а также версия и дата вашего согласия с этой политикой.</li>
@@ -48,6 +49,7 @@ export const LEGAL = {
         <li><b>Google account:</b> identifier, email address and name from your Google profile, stored by the Firebase Authentication sign-in service.</li>
         <li><b>Your name in the app,</b> which you enter yourself.</li>
         <li><b>Pair data:</b> invite code, chores (title, time, difficulty, repeat), stage marks with date and time, stars and the shared pot.</li>
+        <li><b>Rewards:</b> titles and prices of the rewards you add, and your purchases with their date.</li>
         <li><b>Reactions and warm words</b> you send to your partner: which one, when and to which chore.</li>
         <li><b>Notification data</b> (Android app only, and only if you allow notifications): your device's token and the interface language.</li>
         <li><b>Settings:</b> language, and the version and date of your consent to this policy.</li>
@@ -81,6 +83,7 @@ export const LEGAL = {
         <li><b>Λογαριασμός Google:</b> αναγνωριστικό, διεύθυνση email και όνομα από το προφίλ Google, που αποθηκεύονται από την υπηρεσία σύνδεσης Firebase Authentication.</li>
         <li><b>Το όνομά σας στην εφαρμογή,</b> το οποίο εισάγετε εσείς.</li>
         <li><b>Δεδομένα ζευγαριού:</b> κωδικός πρόσκλησης, δουλειές (τίτλος, χρόνος, δυσκολία, επανάληψη), σημειώσεις σταδίων με ημερομηνία και ώρα, αστέρια και κοινός κουμπαράς.</li>
+        <li><b>Ανταμοιβές:</b> τίτλοι και τιμές των ανταμοιβών που προσθέτετε και οι αγορές σας με την ημερομηνία τους.</li>
         <li><b>Αντιδράσεις και τρυφερά λόγια</b> που στέλνετε στο ταίρι σας: ποιο, πότε και σε ποια δουλειά.</li>
         <li><b>Δεδομένα ειδοποιήσεων</b> (μόνο στην εφαρμογή Android και μόνο αν επιτρέψετε ειδοποιήσεις): το διακριτικό (token) της συσκευής σας και η γλώσσα της εφαρμογής.</li>
         <li><b>Ρυθμίσεις:</b> γλώσσα, καθώς και η έκδοση και η ημερομηνία της συναίνεσής σας σε αυτή την πολιτική.</li>

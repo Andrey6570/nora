@@ -2,7 +2,8 @@
 // deps: { db, now } — an Admin Firestore instance (or a fake with the same surface) and the current time.
 import { FieldValue } from "firebase-admin/firestore";
 import { stageStars, togetherStars, parseLogId, periodKey } from "./economy.js";
-import { isKnown, pushText, LIMITS } from "./signals.js";
+import { isKnown, pushText, shopText, LIMITS } from "./signals.js";
+import { GAMES, isPaidGame, gameName } from "./games.js";
 
 const inc = n => FieldValue.increment(n);
 
@@ -57,6 +58,67 @@ export async function onSignalCreated(deps, { pid, id, data }) {
   if (parsed) { const t = await db.doc(`pairs/${pid}/tasks/${parsed.taskId}`).get(); taskTitle = t.exists ? t.data().title : ""; }
   await pushTo(deps, pid, res.partner, res.name || "Nora", lang => pushText(data.kind, data.key, lang, taskTitle));
   return "sent";
+}
+
+// ---- the shop: personal rewards from one's own stars, joint rewards and games from the pot with the partner's consent ----
+// An order document holds only who and what; the server decides the price, the source of the stars and the status:
+//   personal reward -> bought at once from the buyer's balance
+//   joint reward / game -> proposed, bought when the partner agrees (approvedBy), from the pot
+export async function onOrderCreated(deps, { pid, id, data }) {
+  const { db } = deps;
+  const ref = db.doc(`pairs/${pid}/orders/${id}`), pairRef = db.doc(`pairs/${pid}`);
+  const res = await db.runTransaction(async tx => {
+    const pair = await tx.get(pairRef);
+    const p = pair.exists ? pair.data() : null;
+    const reject = reason => { tx.delete(ref); return { reason }; };
+    if (!p || !data || !(p.members || []).includes(data.uid)) return reject("bad-order");
+    const partner = (p.members || []).find(u => u !== data.uid);
+    let title, cost, joint;
+    if (data.kind === "reward") {
+      const r = await tx.get(db.doc(`pairs/${pid}/rewards/${data.ref}`));
+      if (!r.exists) return reject("no-reward");
+      ({ title, cost } = r.data()); joint = r.data().scope === "joint";
+    } else if (data.kind === "game") {
+      if (!isPaidGame(data.ref) || (p.games && p.games[data.ref])) return reject("bad-game");
+      title = data.ref; cost = GAMES[data.ref].cost; joint = true;
+    } else return reject("bad-order");
+    if (!Number.isInteger(cost) || cost < 1) return reject("bad-cost");
+    if (joint) {
+      if (!partner) return reject("no-partner");
+      if ((p.pot || 0) < cost) return reject("not-enough");
+      tx.update(ref, { status: "proposed", cost, title, joint: true });
+      return { partner, name: (p.names && p.names[data.uid]) || "", title, cost, kind: "proposed", game: data.kind === "game" ? data.ref : "" };
+    }
+    if (((p.balances && p.balances[data.uid]) || 0) < cost) return reject("not-enough");
+    tx.update(ref, { status: "bought", cost, title, joint: false });
+    tx.update(pairRef, { [`balances.${data.uid}`]: inc(-cost) });
+    return partner ? { partner, name: (p.names && p.names[data.uid]) || "", title, cost, kind: "personal" } : { done: true };
+  });
+  if (res.reason) return res.reason;
+  if (res.done) return "bought";
+  await pushTo(deps, pid, res.partner, res.name || "Nora", lang => shopText(res.kind, lang, res.game ? gameName(res.game, lang) : res.title, res.cost));
+  return res.kind === "personal" ? "bought" : "proposed";
+}
+
+// The partner agreed to a proposal: spend the pot (if it still holds enough) and unlock a game.
+export async function onOrderUpdated(deps, { pid, id, before, after }) {
+  if (!before || !after || before.approvedBy || !after.approvedBy || after.status !== "proposed") return "ignored";
+  const { db } = deps;
+  const ref = db.doc(`pairs/${pid}/orders/${id}`), pairRef = db.doc(`pairs/${pid}`);
+  const res = await db.runTransaction(async tx => {
+    const [order, pair] = [await tx.get(ref), await tx.get(pairRef)];
+    if (!order.exists || !pair.exists) return { reason: "gone" };
+    const o = order.data(), p = pair.data();
+    if (o.status !== "proposed" || !o.approvedBy) return { reason: "ignored" };
+    if (o.approvedBy === o.uid || !(p.members || []).includes(o.approvedBy)) { tx.update(ref, { approvedBy: FieldValue.delete() }); return { reason: "bad-approval" }; }
+    if ((p.pot || 0) < o.cost) { tx.delete(ref); return { reason: "not-enough" }; }
+    tx.update(ref, { status: "bought" });
+    tx.update(pairRef, Object.assign({ pot: inc(-o.cost) }, o.kind === "game" ? { [`games.${o.ref}`]: true } : {}));
+    return { buyer: o.uid, approver: o.approvedBy, title: o.title, game: o.kind === "game" ? o.ref : "", names: p.names || {} };
+  });
+  if (res.reason) return res.reason;
+  await pushTo(deps, pid, res.buyer, res.names[res.approver] || "Nora", lang => shopText("approved", lang, res.game ? gameName(res.game, lang) : res.title));
+  return "bought";
 }
 
 // A partner marked a stage: check it against the task and award the stars to them and to the shared pot.

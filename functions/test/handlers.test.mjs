@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated } from "../handlers.js";
+import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated } from "../handlers.js";
+import { GAMES, gameName } from "../games.js";
 import { MESSAGES, REACTIONS, pushText } from "../signals.js";
 import { baseStars, stageStars, weekKey, periodKey, logId, parseLogId } from "../economy.js";
 
@@ -12,7 +13,8 @@ function fakeDb(seed) {
     for (const [k, v] of Object.entries(patch)) {
       const keys = k.split("."), last = keys.pop();
       let o = cur; for (const key of keys) o = o[key] = o[key] || {};
-      o[last] = v && typeof v === "object" && "operand" in v ? (Number(o[last]) || 0) + v.operand : v;
+      if (v && v.constructor && v.constructor.name === "DeleteTransform") delete o[last];
+      else o[last] = v && typeof v === "object" && "operand" in v ? (Number(o[last]) || 0) + v.operand : v;
     }
     docs.set(path, cur);
   };
@@ -173,4 +175,72 @@ test("a device whose token is dead is removed", async () => {
   const db = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/signals/s": sig }), messaging = fakeMessaging(["T1"]);
   await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data: sig });
   assert.deepEqual([db.docs.has("pairs/p/devices/d1"), db.docs.has("pairs/p/devices/d2")], [false, true]);
+});
+
+// ---- the shop ----
+const shopPair = { ...sigPair, balances: { a: 20, b: 5 }, pot: 50, games: {} };
+const rewards = { "pairs/p/rewards/sleep": { title: "Сплю до 10", cost: 10, scope: "personal" }, "pairs/p/rewards/dinner": { title: "Ужин вдвоём", cost: 40, scope: "joint" } };
+const order = (kind, ref, uid = "a") => ({ uid, kind, ref, at: 1 });
+const run = async (seed, id, data, messaging = fakeMessaging()) => {
+  const db = fakeDb({ "pairs/p": shopPair, ...devs, ...rewards, ...seed, [`pairs/p/orders/${id}`]: data });
+  return { db, messaging, res: await onOrderCreated({ db, messaging, now }, { pid: "p", id, data }) };
+};
+
+test("a personal reward is bought at once from one's own stars and the partner is told", async () => {
+  const { db, messaging, res } = await run({}, "o1", order("reward", "sleep"));
+  assert.equal(res, "bought");
+  assert.deepEqual(db.docs.get("pairs/p/orders/o1"), { ...order("reward", "sleep"), status: "bought", cost: 10, title: "Сплю до 10", joint: false });
+  assert.deepEqual([db.docs.get("pairs/p").balances.a, db.docs.get("pairs/p").pot], [10, 50]);
+  assert.deepEqual(messaging.sent.map(m => [m.tokens[0], m.notification.body]), [["T1", "Ανταμοιβή: «Сплю до 10»"], ["T2", "Награда: «Сплю до 10»"]]);
+});
+
+test("not enough personal stars: the order is removed", async () => {
+  const { db, res } = await run({ "pairs/p": { ...shopPair, balances: { a: 9 } } }, "o1", order("reward", "sleep"));
+  assert.equal(res, "not-enough");
+  assert.equal(db.docs.has("pairs/p/orders/o1"), false);
+  assert.equal(db.docs.get("pairs/p").balances.a, 9);
+});
+
+test("a joint reward waits for the partner and spends nothing yet", async () => {
+  const { db, messaging, res } = await run({}, "o1", order("reward", "dinner"));
+  assert.equal(res, "proposed");
+  assert.deepEqual([db.docs.get("pairs/p/orders/o1").status, db.docs.get("pairs/p").pot], ["proposed", 50]);
+  assert.match(messaging.sent[0].notification.body, /Ужин вдвоём/);
+});
+
+test("the partner's approval spends the pot; the buyer cannot approve their own proposal", async () => {
+  const { db, messaging } = await run({}, "o1", order("reward", "dinner"));
+  const cur = () => db.docs.get("pairs/p/orders/o1");
+  const mine = { ...cur(), approvedBy: "a" };
+  db.docs.set("pairs/p/orders/o1", mine);
+  assert.equal(await onOrderUpdated({ db, messaging }, { pid: "p", id: "o1", before: { ...mine, approvedBy: undefined }, after: mine }), "bad-approval");
+  assert.equal(cur().approvedBy, undefined);
+  const theirs = { ...cur(), approvedBy: "b" };
+  db.docs.set("pairs/p/orders/o1", theirs);
+  assert.equal(await onOrderUpdated({ db, messaging }, { pid: "p", id: "o1", before: { ...theirs, approvedBy: undefined }, after: theirs }), "bought");
+  assert.deepEqual([cur().status, db.docs.get("pairs/p").pot], ["bought", 10]);
+  assert.equal(await onOrderUpdated({ db, messaging }, { pid: "p", id: "o1", before: { ...theirs, approvedBy: undefined }, after: cur() }), "ignored");
+  assert.equal(db.docs.get("pairs/p").pot, 10);
+});
+
+test("a game is unlocked for the pair after the partner agrees; free and owned games are refused", async () => {
+  const { db, messaging, res } = await run({}, "o1", order("game", "wishes"));
+  assert.equal(res, "proposed");
+  assert.equal(db.docs.get("pairs/p/orders/o1").cost, GAMES.wishes.cost);
+  const after = { ...db.docs.get("pairs/p/orders/o1"), approvedBy: "b" };
+  db.docs.set("pairs/p/orders/o1", after);
+  await onOrderUpdated({ db, messaging }, { pid: "p", id: "o1", before: { ...after, approvedBy: undefined }, after });
+  assert.deepEqual([db.docs.get("pairs/p").games.wishes, db.docs.get("pairs/p").pot], [true, 50 - GAMES.wishes.cost]);
+  assert.equal(gameName("wishes", "el"), "Χάρτης επιθυμιών");
+  assert.equal((await run({}, "o2", order("game", "guess"))).res, "bad-game");
+  assert.equal((await run({ "pairs/p": { ...shopPair, games: { wishes: true } } }, "o3", order("game", "wishes"))).res, "bad-game");
+});
+
+test("bad orders are removed: outsider, unknown reward, empty pot, no partner", async () => {
+  assert.equal((await run({}, "o1", order("reward", "sleep", "x"))).res, "bad-order");
+  assert.equal((await run({}, "o2", order("reward", "nope"))).res, "no-reward");
+  assert.equal((await run({ "pairs/p": { ...shopPair, pot: 5 } }, "o3", order("reward", "dinner"))).res, "not-enough");
+  assert.equal((await run({ "pairs/p": { ...shopPair, members: ["a"] } }, "o4", order("reward", "dinner"))).res, "no-partner");
+  const { db } = await run({}, "o5", order("reward", "nope"));
+  assert.equal(db.docs.has("pairs/p/orders/o5"), false);
 });

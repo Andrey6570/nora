@@ -116,6 +116,47 @@ test("devices: own token only, not readable from the app, deleted by the owner",
   await assertSucceeds(deleteDoc(doc(as("a"), "pairs/p/devices/d1")));
 });
 
+test("rewards: members manage the catalogue with valid fields", async () => {
+  await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
+  const r = { title: "Ужин вдвоём", cost: 40, scope: "joint", createdBy: "a", createdAt: 1 };
+  await assertSucceeds(setDoc(doc(as("b"), "pairs/p/rewards/r1"), r));
+  await assertFails(setDoc(doc(as("x"), "pairs/p/rewards/r2"), r));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/rewards/r3"), { ...r, cost: 0 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/rewards/r4"), { ...r, scope: "everyone" }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/rewards/r5"), { ...r, cost: 1.5 }));
+  await assertSucceeds(deleteDoc(doc(as("a"), "pairs/p/rewards/r1")));
+});
+
+test("orders: asked by the buyer, priced by the server, agreed by the partner", async () => {
+  await seed(async db => {
+    await setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"]));
+    await setDoc(doc(db, "pairs/p/orders/prop"), { uid: "a", kind: "reward", ref: "r", at: 1, status: "proposed", cost: 40, title: "x", joint: true });
+    await setDoc(doc(db, "pairs/p/orders/done"), { uid: "a", kind: "reward", ref: "r", at: 1, status: "bought", cost: 10, title: "x", joint: false });
+    await setDoc(doc(db, "pairs/p/orders/game"), { uid: "a", kind: "game", ref: "wishes", at: 1, status: "bought", cost: 20, title: "wishes", joint: true });
+  });
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/orders/n1"), { uid: "a", kind: "reward", ref: "r", at: 1 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/orders/n2"), { uid: "b", kind: "reward", ref: "r", at: 1 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/orders/n3"), { uid: "a", kind: "reward", ref: "r", at: 1, cost: 1 }));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/orders/n4"), { uid: "a", kind: "reward", ref: "r", at: 1, status: "bought" }));
+  await assertFails(setDoc(doc(as("x"), "pairs/p/orders/n5"), { uid: "x", kind: "reward", ref: "r", at: 1 }));
+  // agreement: only the partner, only their own id
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/orders/prop"), { approvedBy: "a" }));
+  await assertFails(updateDoc(doc(as("b"), "pairs/p/orders/prop"), { approvedBy: "a" }));
+  await assertFails(updateDoc(doc(as("b"), "pairs/p/orders/prop"), { approvedBy: "b", cost: 1 }));
+  await assertSucceeds(updateDoc(doc(as("b"), "pairs/p/orders/prop"), { approvedBy: "b" }));
+  // a bought reward can be marked used, but its price and status cannot be touched
+  await assertSucceeds(updateDoc(doc(as("b"), "pairs/p/orders/done"), { used: true }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/orders/done"), { status: "proposed" }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/orders/done"), { cost: 0 }));
+  await assertFails(updateDoc(doc(as("a"), "pairs/p/orders/game"), { used: true }));
+  // only a proposal can be withdrawn or declined
+  await assertFails(deleteDoc(doc(as("a"), "pairs/p/orders/done")));
+  await assertSucceeds(deleteDoc(doc(as("b"), "pairs/p/orders/prop")));
+  await assertFails(getDoc(doc(as("x"), "pairs/p/orders/done")));
+  // the unlocked games and the pot stay with the server
+  await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "games.wishes": true }));
+});
+
 test("a profile is private", async () => {
   await assertSucceeds(setDoc(doc(as("a"), "users/a"), { pairId: "p", lang: "el" }));
   await assertFails(getDoc(doc(as("b"), "users/a")));

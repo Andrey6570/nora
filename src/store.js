@@ -7,7 +7,7 @@ import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
 import { newInviteCode, normCode, dayKey, logCutoff, uid as newId } from "./domain.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], error: "" };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], error: "" };
 
 let notify = () => {};
 let unsubs = [];
@@ -20,7 +20,7 @@ const userRef = () => doc(db, "users", me());
 
 function stopPair() {
   unsubs.forEach(f => f()); unsubs = [];
-  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = []; M.signals = [];
+  M.pair = null; M.tasks = []; M.logs = new Map(); M.logList = []; M.signals = []; M.rewards = []; M.orders = [];
   RECENT.clear(); ONCE.clear();
 }
 function rebuildLogs() {
@@ -45,6 +45,8 @@ function watchPair(pid) {
   unsubs.push(onSnapshot(query(collection(db, ...base, "log"), where("day", ">=", logCutoff(dayKey()))), s => {
     RECENT.clear(); rows(s).forEach(r => RECENT.set(r.id, r)); rebuildLogs();
   }, onErr));
+  unsubs.push(onSnapshot(collection(db, ...base, "rewards"), s => { M.rewards = rows(s); notify(); }, onErr));
+  unsubs.push(onSnapshot(collection(db, ...base, "orders"), s => { M.orders = rows(s); notify(); }, onErr));
   unsubs.push(onSnapshot(query(collection(db, ...base, "signals"), where("day", ">=", logCutoff(dayKey()))), s => {
     M.signals = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify();
   }, onErr));
@@ -71,6 +73,24 @@ export function start(onChange) {
 
 export const signIn = () => googleSignIn();
 export async function signOutAll() { await unregisterDevice(); stopPair(); await appSignOut(); }
+
+// ---- the shop ----
+const rewardFields = r => ({ title: r.title.trim().slice(0, 80), cost: r.cost, scope: r.scope });
+export async function saveReward(r) {
+  if (r.id) return updateDoc(doc(db, "pairs", M.pair.id, "rewards", r.id), rewardFields(r));
+  await addDoc(collection(db, "pairs", M.pair.id, "rewards"), Object.assign(rewardFields(r), { createdBy: me(), createdAt: Date.now() }));
+}
+export const deleteReward = id => deleteDoc(doc(db, "pairs", M.pair.id, "rewards", id));
+export async function addRewards(list) {
+  const b = writeBatch(db);
+  list.forEach((r, i) => b.set(doc(collection(db, "pairs", M.pair.id, "rewards")), Object.assign(rewardFields(r), { createdBy: me(), createdAt: Date.now() + i })));
+  await b.commit();
+}
+// Ask to buy a reward or a game. The server prices and charges it; a joint one waits for the partner.
+export const placeOrder = (kind, ref) => addDoc(collection(db, "pairs", M.pair.id, "orders"), { uid: me(), kind, ref, at: Date.now() });
+export const approveOrder = id => updateDoc(doc(db, "pairs", M.pair.id, "orders", id), { approvedBy: me() });
+export const cancelOrder = id => deleteDoc(doc(db, "pairs", M.pair.id, "orders", id));
+export const markUsed = id => updateDoc(doc(db, "pairs", M.pair.id, "orders", id), { used: true });
 
 // ---- push: this phone's token, so the partner's reactions and signals reach it ----
 let token = "", deviceLang = "ru", onPushMessage = () => {};

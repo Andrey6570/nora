@@ -72,9 +72,11 @@ A5:67:4B:11:C8:09:6A:92:B0:03:CB:AA:FC:6C:DD:34:4E:B4:73:BF
 ```
 users/{uid}                 pairId, name, lang, consent
 invites/{код}               pid
-pairs/{pid}                 members[2], names, inviteCode, scale; balances, pot, xp, sigDay — только сервер
+pairs/{pid}                 members[2], names, inviteCode, scale; balances, pot, xp, sigDay, games — только сервер
 pairs/{pid}/tasks/{id}      title, minutes, difficulty, repeat (once/daily/weekly), full (три этапа)
 pairs/{pid}/log/{id}        uid, day, at, once, together; stars — только сервер
+pairs/{pid}/rewards/{id}    title, cost, scope (personal/joint) — каталог наград пары
+pairs/{pid}/orders/{id}     uid, kind (reward/game), ref, at, approvedBy, used; status, cost, title, joint — только сервер
 pairs/{pid}/signals/{id}    from, kind (message/reaction), key, ref, day, at — тёплые слова и реакции
 pairs/{pid}/devices/{id}    uid, token, lang — токен push этого телефона (читает только сервер)
 ```
@@ -132,7 +134,8 @@ npm run sync             # собрать веб и обновить android/
 1. ✅ **Реакции и тёплые слова с push.** Реакции ❤️ 👏 🔥 🤗 🙏 на отметки партнёра (30 в день) и 14 готовых фраз
    (10 в день) во вкладке «Тепло». Сервер проверяет сигнал и лимит, партнёр получает push на своём языке.
    Свободного чата нет: общение идёт в мессенджерах, а здесь — признание вклада.
-2. **Траты из копилки.** Совместные награды и покупка игр за звёзды копилки; сервер проверяет баланс.
+2. ✅ **Траты из копилки.** Личные награды покупаются из своих звёзд сразу, совместные и игры — из копилки, когда
+   партнёр согласится. Цену и списание делает сервер (`onOrderCreated`, `onOrderUpdated`); каталог игр — `functions/games.js`.
 3. **Игры.** «Угадай ответ», «Карта желаний» (видны только совпадения), «Колесо свиданий»; затем «36 вопросов»,
    «Правда или действие: романтика», колоды «Флирт», «Мечты и планы», «Воспоминания», купоны, квест-свидание дома,
    «30 дней близости». Уровень — флирт и романтика без откровенного контента (правила Google Play).
