@@ -16,7 +16,10 @@
     </style>
 
 
+    <!-- Before Android 12 the picture in @drawable/splash is shown; Android 12 and later draw the app icon on the cream colour -->
     <style name="AppTheme.NoActionBarLaunch" parent="Theme.SplashScreen">
         <item name="android:background">@drawable/splash</item>
+        <item name="windowSplashScreenBackground">@color/nora_splash</item>
+        <item name="windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
     </style>
 </resources>

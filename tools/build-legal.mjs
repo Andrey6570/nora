@@ -1,6 +1,6 @@
 // Builds public pages of the privacy policy and terms from src/legal.js into hosting/ for Firebase Hosting:
 // /legal/privacy-ru.html, /legal/terms-en.html and so on, plus /legal/ with links to all of them.
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync, copyFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { LEGAL } from "../src/legal.js";
 
@@ -14,10 +14,11 @@ mark{background:#FFE58A;padding:0 2px;border-radius:3px}
 
 const page = (lang, title, body) => `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} · Nora</title><style>${css}</style></head><body><main>${body}</main></body></html>
+<title>${title} · Nora</title><link rel="icon" type="image/svg+xml" href="../icon.svg"><style>${css}</style></head><body><main>${body}</main></body></html>
 `;
 
 mkdirSync(OUT, { recursive: true });
+copyFileSync(fileURLToPath(new URL("../public/icon.svg", import.meta.url)), OUT + "../icon.svg");
 const links = [];
 for (const kind of Object.keys(LEGAL)) {
   for (const [lang, d] of Object.entries(LEGAL[kind])) {

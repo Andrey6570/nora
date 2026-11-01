@@ -8,7 +8,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "sync": "vite build && cap sync android",
-    "test": "node --test test/unit.test.mjs",
+    "test": "node --test test/unit.test.mjs test/branding.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project nora-test \"node --test test/rules.test.mjs\""
   },
   "dependencies": {
