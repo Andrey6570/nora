@@ -296,5 +296,21 @@ export const EN = {
   "Предметы покупаются из копилки, когда партнёр согласен. В копилке: {n} ★": "Items are bought from the pot when your partner agrees. In the pot: {n} ★",
   "Собрано: {a} из {b}": "Collected: {a} of {b}",
   "Уют": "Cosiness",
-  "Жильё питомца": "Burrow"
+  "Жильё питомца": "Burrow",
+  "Без расходов": "No spending",
+  "Вне дома": "Away from home",
+  "Всё равно": "Either",
+  "Где": "Where",
+  "Дома": "At home",
+  "Любые": "Any",
+  "Подходящих идей: {n} из {all}": "Matching ideas: {n} of {all}",
+  "Расходы": "Spending",
+  "С расходами": "With spending",
+  "Таких идей нет. Измените фильтры.": "No such ideas. Change the filters.",
+  "🆓 Без расходов": "🆓 No spending",
+  "🆓💸 По желанию": "🆓💸 Your choice",
+  "🌆 Вне дома": "🌆 Away from home",
+  "🏠 Дома": "🏠 At home",
+  "🏠🌆 Дома или вне дома": "🏠🌆 At home or away",
+  "💸 С расходами": "💸 With spending"
 };

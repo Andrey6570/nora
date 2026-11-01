@@ -2,7 +2,7 @@
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { GAMES, gameName, isUnlocked } from "../functions/games.js";
-import { WHEEL, DECKS, GUESS, WISHES, COUPONS, SCRIPTS, DAYS30, pick } from "../functions/gamedata.js";
+import { WHEEL, DECKS, GUESS, WISHES, COUPONS, SCRIPTS, DAYS30, pick, wheelPool } from "../functions/gamedata.js";
 import { dayKey } from "../functions/economy.js";
 
 const star = n => `<span class="star">★</span>${n}`;
@@ -56,7 +56,7 @@ export function gamesTab(S) {
 
 // ---------- a game ----------
 export function initialGame(id) {
-  if (id === "wheel") return { id, cur: null, spinning: false };
+  if (id === "wheel") return Object.assign({ id, cur: null, spinning: false }, wheelFilters());
   if (DECKS[id]) return { id, idx: Number(deckPos(id)) || 0, order: id === "questions36" ? DECKS[id].map((_, i) => i) : shuffle(DECKS[id].length) };
   if (id === "guess") return { id, open: null, step: 0, v: null };
   if (id === "coupons") return { id, adding: false, text: "" };
@@ -69,6 +69,13 @@ export function shuffle(n) {
   return a;
 }
 export const deckKey = id => "nora-deck-" + id;
+export const WHEEL_FILTER_KEY = "nora-wheel-filter";
+const PLACES = ["any", "home", "out"], COSTS = ["any", "free", "paid"];
+// The last filters used on this phone
+export function wheelFilters() {
+  try { const f = JSON.parse(localStorage.getItem(WHEEL_FILTER_KEY) || "{}"); return { place: PLACES.includes(f.place) ? f.place : "any", cost: COSTS.includes(f.cost) ? f.cost : "any" }; }
+  catch (e) { return { place: "any", cost: "any" }; }
+}
 function deckPos(id) { try { return localStorage.getItem(deckKey(id)); } catch (e) { return 0; } }
 
 export function gameScreen(S, ui) {
@@ -79,11 +86,22 @@ export function gameScreen(S, ui) {
     <main class="page">${body}${ui.err ? `<p class="err" role="alert">${esc(ui.err)}</p>` : ""}</main>`;
 }
 
+const TAG_PLACE = { home: "🏠 Дома", out: "🌆 Вне дома", both: "🏠🌆 Дома или вне дома" };
+const TAG_COST = { free: "🆓 Без расходов", paid: "💸 С расходами", both: "🆓💸 По желанию" };
+function filterRow(label, name, options, cur) {
+  return `<div class="filter"><span class="muted small">${t(label)}</span><div class="seg" role="radiogroup">${options.map(([v, text]) =>
+    `<button type="button" role="radio" aria-checked="${v === cur}" class="${v === cur ? "on" : ""}" data-act="wheel-filter" data-name="${name}" data-v="${v}">${t(text)}</button>`).join("")}</div></div>`;
+}
 function wheel(S, g) {
-  const cur = g.cur;
-  return `<section class="card wheel-box"><div class="wheel-face ${g.spinning ? "spin" : ""}" aria-live="polite">${cur == null ? "🎡" : esc(pick(WHEEL[cur], lang()))}</div>
-    <button class="btn primary big" data-act="wheel-spin" ${g.spinning ? "disabled" : ""}>${cur == null ? t("Крутить") : t("Крутить ещё")}</button>
-    <p class="muted small">${t("Идея не нравится? Крутите ещё. Выполнили вместе — отметьте дело в «Делах» как «Вдвоём».")}</p></section>`;
+  const cur = g.cur, pool = wheelPool(g.place, g.cost), shown = cur != null && !g.spinning ? WHEEL[cur] : null;
+  return `<section class="card">
+      ${filterRow("Где", "place", [["any", "Всё равно"], ["home", "Дома"], ["out", "Вне дома"]], g.place)}
+      ${filterRow("Расходы", "cost", [["any", "Любые"], ["free", "Без расходов"], ["paid", "С расходами"]], g.cost)}
+      <p class="muted small">${pool.length ? t("Подходящих идей: {n} из {all}", { n: pool.length, all: WHEEL.length }) : t("Таких идей нет. Измените фильтры.")}</p></section>
+    <section class="card wheel-box"><div class="wheel-face ${g.spinning ? "spin" : ""}" aria-live="polite">${cur == null ? "🎡" : esc(pick(WHEEL[cur], lang()))}</div>
+      ${shown ? `<div class="tags"><span class="chip">${t(TAG_PLACE[shown[3]])}</span><span class="chip">${t(TAG_COST[shown[4]])}</span></div>` : ""}
+      <button class="btn primary big" data-act="wheel-spin" ${g.spinning || !pool.length ? "disabled" : ""}>${cur == null ? t("Крутить") : t("Крутить ещё")}</button>
+      <p class="muted small">${t("Идея не нравится? Крутите ещё. Выполнили вместе — отметьте дело в «Делах» как «Вдвоём».")}</p></section>`;
 }
 
 function deck(S, g) {

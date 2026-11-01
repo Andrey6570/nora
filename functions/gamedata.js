@@ -1,37 +1,25 @@
-// Content of the games for two. Every text is [Russian, English, Greek]. Plain data without imports, shared by the app
-// and the server (which only needs the sizes). The tone is romantic and playful, nothing explicit (store rules).
+// Content of the games for two. Every text is [Russian, English, Greek]. Plain data (only imports of sibling data files),
+// shared by the app and the server (which only needs the sizes). Each card game has 100 cards, except the classic 36 questions. The tone is romantic and playful, nothing explicit (store rules).
 // Greek is written gender-neutral; a native speaker should read it before a public release.
+
+import { TRUTH_MORE, FLIRT_MORE, DREAMS_MORE, MEMORIES_MORE } from "./gamedata-decks.js";
+import { GUESS_MORE } from "./gamedata-guess.js";
+import { WISHES_MORE } from "./gamedata-wishes.js";
 
 const L = { ru: 0, en: 1, el: 2 };
 export const pick = (t, lang) => t[L[lang]] || t[1];
 
-// ---- Date wheel (free) ----
-export const WHEEL = [
-  ["Ужин при свечах дома", "Candlelit dinner at home", "Δείπνο με κεριά στο σπίτι"],
-  ["Пикник в парке или на балконе", "Picnic in the park or on the balcony", "Πικνίκ στο πάρκο ή στο μπαλκόνι"],
-  ["Закат в лучшей точке города", "Sunset at the best spot in town", "Ηλιοβασίλεμα στο καλύτερο σημείο της πόλης"],
-  ["Кино дома: выбираем фильм по очереди", "Movie night at home, taking turns to choose", "Ταινία στο σπίτι, επιλέγουμε εναλλάξ"],
-  ["Готовим новое блюдо вместе", "Cook a new dish together", "Μαγειρεύουμε μαζί ένα νέο πιάτο"],
-  ["Прогулка без телефонов", "A walk without phones", "Βόλτα χωρίς κινητά"],
-  ["Танцы дома под любимые песни", "Dance at home to favourite songs", "Χορός στο σπίτι με αγαπημένα τραγούδια"],
-  ["Настольные игры вдвоём", "Board games for two", "Επιτραπέζια οι δυο μας"],
-  ["Кофе и десерт в новом месте", "Coffee and dessert somewhere new", "Καφές και γλυκό σε νέο μέρος"],
-  ["Поездка на море или в горы на один день", "A day trip to the sea or the mountains", "Μονοήμερη εκδρομή στη θάλασσα ή στο βουνό"],
-  ["Смотрим старые фото и вспоминаем", "Look at old photos and reminisce", "Βλέπουμε παλιές φωτογραφίες και θυμόμαστε"],
-  ["Домашний мини-спа: массаж и маски", "A mini spa at home: massage and face masks", "Σπα στο σπίτι: μασάζ και μάσκες προσώπου"],
-  ["Игра «Угадай ответ» за ужином", "“Guess the answer” over dinner", "«Μάντεψε την απάντηση» στο δείπνο"],
-  ["Смотрим на звёзды с балкона или за городом", "Stargazing from the balcony or out of town", "Παρατήρηση αστεριών από το μπαλκόνι ή έξω από την πόλη"],
-  ["Пишем друг другу письма и читаем вслух", "Write each other letters and read them aloud", "Γράφουμε γράμματα ο ένας στον άλλον και τα διαβάζουμε φωναχτά"],
-  ["Идём на рынок и выбираем продукты для ужина", "Go to the market and pick ingredients for dinner", "Πάμε στη λαϊκή και διαλέγουμε υλικά για το δείπνο"],
-  ["Завтрак в постели в выходной", "Weekend breakfast in bed", "Πρωινό στο κρεβάτι το Σαββατοκύριακο"],
-  ["Активное свидание: бег, велосипед или йога вдвоём", "An active date: running, cycling or yoga together", "Δραστήριο ραντεβού: τρέξιμο, ποδήλατο ή γιόγκα μαζί"],
-  ["Рисуем портреты друг друга", "Draw each other's portraits", "Ζωγραφίζουμε πορτρέτα ο ένας του άλλου"],
-  ["Дегустация дома: сыр, вино или чай", "A tasting at home: cheese, wine or tea", "Γευσιγνωσία στο σπίτι: τυρί, κρασί ή τσάι"],
-  ["Вечер, в котором всё решает партнёр", "An evening where your partner decides everything", "Μια βραδιά όπου όλα τα αποφασίζει το ταίρι σας"],
-  ["Строим шалаш из подушек и пледов", "Build a fort of pillows and blankets", "Φτιάχνουμε καλύβα από μαξιλάρια και κουβέρτες"],
-  ["Идём туда, где было первое свидание", "Go back to where the first date was", "Πάμε εκεί που έγινε το πρώτο ραντεβού"],
-  ["Составляем список мечт на год", "Make a list of dreams for the year", "Φτιάχνουμε λίστα με όνειρα για τη χρονιά"]
-];
+// ---- Date wheel (free): 100 ideas tagged by place (home / out) and cost (free / paid), see gamedata-wheel.js ----
+import { WHEEL } from "./gamedata-wheel.js";
+export { WHEEL };
+
+// Indices of the wheel ideas that fit the filters. place: any | home | out; cost: any | free | paid.
+// An idea tagged "both" fits either choice.
+export function wheelPool(place = "any", cost = "any") {
+  if (!["any", "home", "out"].includes(place) || !["any", "free", "paid"].includes(cost)) return [];
+  const fit = (want, tag) => want === "any" || tag === "both" || tag === want;
+  return WHEEL.map((w, i) => i).filter(i => fit(place, WHEEL[i][3]) && fit(cost, WHEEL[i][4]));
+}
 
 // ---- Card decks: draw a card, answer out loud, in person ----
 export const DECKS = {
@@ -152,7 +140,7 @@ export const DECKS = {
 };
 
 // ---- Guess the answer (free): each partner answers about themselves and guesses the other; shown when both are done ----
-export const GUESS = [
+const GUESS_BASE = [
   { q: ["Мой идеальный вечер выходного", "My ideal weekend evening", "Η ιδανική μου βραδιά Σαββατοκύριακου"], o: [["Кино дома", "A movie at home", "Ταινία στο σπίτι"], ["Прогулка", "A walk", "Βόλτα"], ["Ужин в ресторане", "Dinner at a restaurant", "Δείπνο σε εστιατόριο"], ["Игры или хобби", "Games or a hobby", "Παιχνίδια ή χόμπι"]] },
   { q: ["Что я выберу на завтрак", "What I pick for breakfast", "Τι διαλέγω για πρωινό"], o: [["Яичницу", "Eggs", "Αυγά"], ["Кашу", "Porridge", "Χυλό"], ["Бутерброды", "Sandwiches", "Σάντουιτς"], ["Только кофе", "Just coffee", "Μόνο καφέ"]] },
   { q: ["Мой отпуск мечты", "My dream holiday", "Οι διακοπές των ονείρων μου"], o: [["Море", "The sea", "Θάλασσα"], ["Горы", "Mountains", "Βουνό"], ["Большой город", "A big city", "Μεγάλη πόλη"], ["Тихая деревня", "A quiet village", "Ήσυχο χωριό"]] },
@@ -172,7 +160,7 @@ export const GUESS = [
 ];
 
 // ---- Wish map (paid): each partner answers privately; only matches are shown, a "no" is never revealed ----
-export const WISHES = [
+const WISHES_BASE = [
   ["Ужин при свечах", "A candlelit dinner", "Δείπνο με κεριά"],
   ["Медленный танец дома под нашу песню", "A slow dance at home to our song", "Αργός χορός στο σπίτι με το τραγούδι μας"],
   ["Массаж друг другу", "A massage for each other", "Μασάζ ο ένας στον άλλον"],
@@ -279,6 +267,14 @@ export const DAYS30 = [
   ["Напишите друг другу письмо «что я люблю в тебе».", "Write each other a letter: “what I love about you”.", "Γράψτε ο ένας στον άλλον ένα γράμμα «τι αγαπώ σε σένα»."],
   ["Отметьте тридцатый день: выберите, что оставить в привычку.", "Mark day thirty: choose what to keep as a habit.", "Γιορτάστε την τριακοστή μέρα: διαλέξτε τι θα κρατήσετε ως συνήθεια."]
 ];
+
+// ---- the first cards above plus the extra ones: 100 of each ----
+DECKS.truth = [...DECKS.truth, ...TRUTH_MORE];
+DECKS.flirt = [...DECKS.flirt, ...FLIRT_MORE];
+DECKS.dreams = [...DECKS.dreams, ...DREAMS_MORE];
+DECKS.memories = [...DECKS.memories, ...MEMORIES_MORE];
+export const GUESS = [...GUESS_BASE, ...GUESS_MORE];
+export const WISHES = [...WISHES_BASE, ...WISHES_MORE];
 
 // sizes the server needs to check an answer
 export const GUESS_OPTIONS = GUESS.map(g => g.o.length);

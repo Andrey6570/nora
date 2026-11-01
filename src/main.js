@@ -3,8 +3,8 @@ import { t, getLang, setLang } from "./i18n.js";
 import * as V from "./views.js";
 import { configured } from "./fb.js";
 import { taskView, dayKey, PACKS, packTask, REWARD_PACKS, rewardRow } from "./domain.js";
-import { initialGame, shuffle, deckKey, dayNumber } from "./gameviews.js";
-import { WHEEL, COUPONS, DECKS, pick } from "../functions/gamedata.js";
+import { initialGame, shuffle, deckKey, dayNumber, WHEEL_FILTER_KEY } from "./gameviews.js";
+import { WHEEL, COUPONS, DECKS, pick, wheelPool } from "../functions/gamedata.js";
 import { DEFAULT_NAMES } from "./petdata.js";
 import { stageOf } from "../functions/pet.js";
 
@@ -179,11 +179,21 @@ const actions = {
   "game-back": () => { stopWheel(); ui.game = null; ui.err = ""; render(); },
   "buy-game": el => { ui.err = ""; ui.sheet = { type: "buygame", id: el.dataset.id }; render(); },
   "buy-game-yes": el => run(async () => { await store.placeOrder("game", el.dataset.id); ui.sheet = null; }, "Предложено партнёру"),
+  "wheel-filter": el => {
+    const g = ui.game; g[el.dataset.name] = el.dataset.v;
+    LS.set(WHEEL_FILTER_KEY, JSON.stringify({ place: g.place, cost: g.cost }));
+    // the shown idea may no longer fit
+    if (g.cur != null && !wheelPool(g.place, g.cost).includes(g.cur)) g.cur = null;
+    render();
+  },
   "wheel-spin": () => {
-    const g = ui.game; if (g.spinning) return;
-    g.spinning = true; let n = 0; const final = Math.floor(Math.random() * WHEEL.length);
+    const g = ui.game, pool = wheelPool(g.place, g.cost);
+    if (g.spinning || !pool.length) return;
+    // do not repeat the idea on the screen when there is a choice
+    const choices = pool.length > 1 ? pool.filter(i => i !== g.cur) : pool;
+    g.spinning = true; let n = 0; const final = choices[Math.floor(Math.random() * choices.length)];
     wheelTimer = setInterval(() => {
-      n++; g.cur = n > 14 ? final : Math.floor(Math.random() * WHEEL.length);
+      n++; g.cur = n > 14 ? final : pool[Math.floor(Math.random() * pool.length)];
       if (n > 14) { stopWheel(); g.spinning = false; }
       render();
     }, 100);

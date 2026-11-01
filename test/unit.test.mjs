@@ -83,7 +83,7 @@ test("meters rise with recent chores, warm words and joint activity", () => {
   assert.deepEqual([quiet.comfort, quiet.care, quiet.close, quiet.recent], [0, 0, 0, false]);
   const busy = meters(S0({
     logList: [1, 2, 3, 4].map(i => ({ id: "t_do_" + i, uid: "a", day: T, stars: 2 })).concat([{ id: "u_do_once", uid: "a", day: "2026-10-26", stars: 4, together: true }]),
-    signals: [{ day: T }, { day: T }], coupons: [{ at: Date.now() }]
+    signals: [{ day: T }, { day: T }], coupons: [{ at: new Date(2026, 9, 28, 12).getTime() }]
   }), T);
   assert.deepEqual([busy.comfort, busy.care, busy.close, busy.recent], [60, 40, 40, true]);
   assert.equal(meters(S0({ logList: [{ id: "x", day: "2026-10-01", stars: 5 }] }), T).comfort, 0);

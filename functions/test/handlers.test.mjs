@@ -251,13 +251,18 @@ test("bad orders are removed: outsider, unknown reward, empty pot, no partner", 
 // ---- games for two ----
 test("game content: every text has three languages and the sizes are sane", () => {
   const triple = t => Array.isArray(t) && t.length === 3 && t.every(x => typeof x === "string" && x.length > 2 && x.length < 220);
-  const all = [...G.WHEEL, ...Object.values(G.DECKS).flat(), ...G.WISHES, ...G.COUPONS, ...G.DAYS30,
+  const all = [...G.WHEEL.map(w => w.slice(0, 3)), ...Object.values(G.DECKS).flat(), ...G.WISHES, ...G.COUPONS, ...G.DAYS30,
     ...G.GUESS.flatMap(g => [g.q, ...g.o]), ...G.SCRIPTS.flatMap(s => [s.title, ...s.steps])];
   assert.deepEqual(all.filter(t => !triple(t)), []);
   assert.equal(G.DAYS30.length, 30);
   assert.equal(G.DECKS.questions36.length, 36);
   assert.ok(G.GUESS.every(g => g.o.length >= 3 && g.o.length <= 4));
-  assert.ok(G.WISHES.length < 100 && G.GUESS.length < 100);
+  // each card game has 100 cards (the classic 36 questions stay 36), and no card repeats inside a game
+  assert.deepEqual([G.WHEEL.length, G.WISHES.length, G.GUESS.length, ...["truth", "flirt", "dreams", "memories"].map(k => G.DECKS[k].length)], [100, 100, 100, 100, 100, 100, 100]);
+  const dup = list => list.length - new Set(list).size;
+  assert.deepEqual([G.WHEEL.map(w => w[0]), G.WISHES.map(w => w[0]), G.GUESS.map(g => g.q[0]), ...Object.values(G.DECKS).map(d => d.map(c => c[0]))].map(dup), [0, 0, 0, 0, 0, 0, 0, 0]);
+  // answers are stored under two-digit item numbers
+  assert.ok(G.GUESS.length <= 100 && G.WISHES.length <= 100 && G.GUESS_OPTIONS.length === G.GUESS.length);
   assert.deepEqual(Object.keys(GAMES).sort(), ["coupons", "dreams", "flirt", "guess", "homeDate", "intimacy30", "memories", "questions36", "truth", "wheel", "wishes"]);
 });
 
@@ -289,7 +294,7 @@ test("wishes: only matches are revealed and a no is never shown", async () => {
 });
 
 test("bad answers are removed: unknown game, out of range, locked game, wrong id, outsider, odd shape", async () => {
-  const cases = [["unknown game", ans("chess", 1, "a", { v: 1 }), gp], ["item out of range", ans("guess", 99, "a", { v: 1, g: 1 }), gp],
+  const cases = [["unknown game", ans("chess", 1, "a", { v: 1 }), gp], ["item out of range", ans("guess", 100, "a", { v: 1, g: 1 }), gp],
     ["option out of range", ans("guess", 0, "a", { v: 9, g: 1 }), gp], ["wish locked", ans("wishes", 1, "a", { v: "yes" }), sigPair],
     ["bad wish value", ans("wishes", 1, "a", { v: "love" }), gp], ["outsider", ans("guess", 1, "x", { v: 1, g: 1 }), gp],
     ["guess without guess", ans("guess", 1, "a", { v: 1 }), gp]];
@@ -414,4 +419,31 @@ test("decor and pet catalogues are complete", () => {
   assert.ok(Object.values(DECOR_NAMES).every(n => n.length === 3 && n.every(x => x.length > 2)));
   assert.ok(Object.values(DECOR).every(d => Number.isInteger(d.cost) && d.cost > 0 && d.icon));
   assert.equal(STAGES.length, 4);
+});
+
+test("date wheel: every idea is tagged and the filters pick the right ones", () => {
+  assert.ok(G.WHEEL.every(w => w.length === 5 && ["home", "out", "both"].includes(w[3]) && ["free", "paid", "both"].includes(w[4])));
+  const all = G.wheelPool().length;
+  assert.equal(all, 100);
+  const home = G.wheelPool("home"), out = G.wheelPool("out"), free = G.wheelPool("any", "free"), paid = G.wheelPool("any", "paid");
+  assert.ok(home.every(i => G.WHEEL[i][3] !== "out") && out.every(i => G.WHEEL[i][3] !== "home"));
+  assert.ok(free.every(i => G.WHEEL[i][4] !== "paid") && paid.every(i => G.WHEEL[i][4] !== "free"));
+  assert.ok(home.length + out.length >= all);
+  // each of the four combinations has plenty of ideas, so no filter leaves the wheel empty
+  for (const [p, c] of [["home", "free"], ["home", "paid"], ["out", "free"], ["out", "paid"]]) assert.ok(G.wheelPool(p, c).length >= 8, p + c);
+  // ideas tagged "both" show up for either choice
+  const either = G.WHEEL.map((w, i) => i).filter(i => G.WHEEL[i][3] === "both" && G.WHEEL[i][4] === "both");
+  assert.ok(either.length >= 1 && either.every(i => G.wheelPool("home", "free").includes(i) && G.wheelPool("out", "paid").includes(i)));
+  assert.deepEqual(G.wheelPool("home", "free").filter(i => !G.WHEEL[i][3].match(/home|both/) || !G.WHEEL[i][4].match(/free|both/)), []);
+  assert.equal(G.wheelPool("nowhere", "never").length, 0);
+});
+
+test("the last cards of the 100 work: item 99 of guess and of wishes", async () => {
+  const a = ans("guess", 99, "a", { v: 3, g: 0 }), b = ans("guess", 99, "b", { v: 0, g: 3 });
+  const { db, res } = await answer({ [`pairs/p/answers/${idOf(a)}`]: a }, b);
+  assert.equal(res, "revealed");
+  assert.ok(db.docs.has("pairs/p/results/guess_99"));
+  const w = ans("wishes", 99, "a", { v: "yes" }), x = ans("wishes", 99, "b", { v: "yes" });
+  assert.equal((await answer({ [`pairs/p/answers/${idOf(w)}`]: w }, x)).res, "match");
+  assert.equal((await answer({}, ans("wishes", 100, "a", { v: "yes" }))).res, "bad-answer");
 });
