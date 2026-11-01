@@ -1,8 +1,8 @@
 // Content of the games for two. Every text is [Russian, English, Greek]. Plain data (only imports of sibling data files),
-// shared by the app and the server (which only needs the sizes). Each card game has 100 cards, except the classic 36 questions. The tone is romantic and playful, nothing explicit (store rules).
+// shared by the app and the server (which only needs the sizes). Each card game has 100 cards. The tone is romantic and playful, nothing explicit (store rules).
 // Greek is written gender-neutral; a native speaker should read it before a public release.
 
-import { TRUTH_MORE, FLIRT_MORE, DREAMS_MORE, MEMORIES_MORE } from "./gamedata-decks.js";
+import { TRUTH_MORE, FLIRT_MORE, DREAMS_MORE, MEMORIES_MORE, QUESTIONS_MORE } from "./gamedata-decks.js";
 import { GUESS_MORE } from "./gamedata-guess.js";
 import { WISHES_MORE } from "./gamedata-wishes.js";
 
@@ -268,7 +268,12 @@ export const DAYS30 = [
   ["Отметьте тридцатый день: выберите, что оставить в привычку.", "Mark day thirty: choose what to keep as a habit.", "Γιορτάστε την τριακοστή μέρα: διαλέξτε τι θα κρατήσετε ως συνήθεια."]
 ];
 
+// Where each part of "Questions to get closer" starts. The first three are the classic 36 (12 each), then four parts of 16.
+export const DECK_PARTS = { questions36: [0, 12, 24, 36, 52, 68, 84] };
+export const partOf = (deck, i) => { const b = DECK_PARTS[deck]; return b ? b.filter(x => x <= i).length : 0; };
+
 // ---- the first cards above plus the extra ones: 100 of each ----
+DECKS.questions36 = [...DECKS.questions36, ...QUESTIONS_MORE];
 DECKS.truth = [...DECKS.truth, ...TRUTH_MORE];
 DECKS.flirt = [...DECKS.flirt, ...FLIRT_MORE];
 DECKS.dreams = [...DECKS.dreams, ...DREAMS_MORE];

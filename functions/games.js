@@ -4,7 +4,7 @@
 export const GAMES = {
   guess: { name: { ru: "Угадай ответ", en: "Guess the answer", el: "Μάντεψε την απάντηση" }, icon: "🔮", cost: 0, ready: true },
   wheel: { name: { ru: "Колесо свиданий", en: "Date wheel", el: "Τροχός ραντεβού" }, icon: "🎡", cost: 0, ready: true },
-  questions36: { name: { ru: "36 вопросов", en: "36 questions", el: "36 ερωτήσεις" }, icon: "💬", cost: 0, ready: true },
+  questions36: { name: { ru: "Вопросы для сближения", en: "Questions to get closer", el: "Ερωτήσεις για να έρθετε πιο κοντά" }, icon: "💬", cost: 0, ready: true },
   truth: { name: { ru: "Правда или действие: романтика", en: "Truth or dare: romance", el: "Αλήθεια ή πρόκληση: ρομαντικό" }, icon: "🎭", cost: 0, ready: true },
   wishes: { name: { ru: "Карта желаний", en: "Wish map", el: "Χάρτης επιθυμιών" }, icon: "🗝", cost: 20, ready: true },
   flirt: { name: { ru: "Колода «Флирт»", en: "Deck “Flirt”", el: "Τράπουλα «Φλερτ»" }, icon: "😏", cost: 20, ready: true },

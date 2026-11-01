@@ -255,12 +255,19 @@ test("game content: every text has three languages and the sizes are sane", () =
     ...G.GUESS.flatMap(g => [g.q, ...g.o]), ...G.SCRIPTS.flatMap(s => [s.title, ...s.steps])];
   assert.deepEqual(all.filter(t => !triple(t)), []);
   assert.equal(G.DAYS30.length, 30);
-  assert.equal(G.DECKS.questions36.length, 36);
+  assert.equal(G.DECKS.questions36.length, 100);
+  // the classic 36 come first, in three parts of 12, and the extra 64 follow in four parts of 16
+  assert.deepEqual(G.DECK_PARTS.questions36, [0, 12, 24, 36, 52, 68, 84]);
+  assert.deepEqual([0, 11, 12, 35, 36, 51, 52, 99].map(i => G.partOf("questions36", i)), [1, 1, 2, 3, 4, 4, 5, 7]);
+  assert.equal(G.partOf("truth", 5), 0);
   assert.ok(G.GUESS.every(g => g.o.length >= 3 && g.o.length <= 4));
-  // each card game has 100 cards (the classic 36 questions stay 36), and no card repeats inside a game
-  assert.deepEqual([G.WHEEL.length, G.WISHES.length, G.GUESS.length, ...["truth", "flirt", "dreams", "memories"].map(k => G.DECKS[k].length)], [100, 100, 100, 100, 100, 100, 100]);
+  // each card game has 100 cards, and no card repeats inside a game
+  assert.deepEqual([G.WHEEL.length, G.WISHES.length, G.GUESS.length, ...Object.keys(G.DECKS).map(k => G.DECKS[k].length)], [100, 100, 100, 100, 100, 100, 100, 100]);
   const dup = list => list.length - new Set(list).size;
   assert.deepEqual([G.WHEEL.map(w => w[0]), G.WISHES.map(w => w[0]), G.GUESS.map(g => g.q[0]), ...Object.values(G.DECKS).map(d => d.map(c => c[0]))].map(dup), [0, 0, 0, 0, 0, 0, 0, 0]);
+  // no card text is shared between two different decks either
+  const deckTexts = Object.values(G.DECKS).flat().map(c => c[0]);
+  assert.equal(dup(deckTexts), 0);
   // answers are stored under two-digit item numbers
   assert.ok(G.GUESS.length <= 100 && G.WISHES.length <= 100 && G.GUESS_OPTIONS.length === G.GUESS.length);
   assert.deepEqual(Object.keys(GAMES).sort(), ["coupons", "dreams", "flirt", "guess", "homeDate", "intimacy30", "memories", "questions36", "truth", "wheel", "wishes"]);

@@ -2,7 +2,7 @@
 import { t, getLang } from "./i18n.js";
 import { esc } from "./util.js";
 import { GAMES, gameName, isUnlocked } from "../functions/games.js";
-import { WHEEL, DECKS, GUESS, WISHES, COUPONS, SCRIPTS, DAYS30, pick, wheelPool } from "../functions/gamedata.js";
+import { WHEEL, DECKS, GUESS, WISHES, COUPONS, SCRIPTS, DAYS30, DECK_PARTS, partOf, pick, wheelPool } from "../functions/gamedata.js";
 import { dayKey } from "../functions/economy.js";
 
 const star = n => `<span class="star">★</span>${n}`;
@@ -14,7 +14,7 @@ const lang = () => getLang();
 const INFO = {
   guess: "Оба отвечают о себе и угадывают ответ партнёра. Ответы видны, когда ответили оба.",
   wheel: "Крутите колесо и получайте идею для свидания.",
-  questions36: "36 вопросов от лёгких к самым личным: сближают за один вечер.",
+  questions36: "100 вопросов от лёгких к самым личным. Первые 36 — классический набор для сближения.",
   truth: "Мягкая романтическая версия: вопросы и задания.",
   wishes: "Каждый тайно отмечает «да / может быть / нет». Видны только совпадения, отказ не показывается никому.",
   flirt: "Игривые вопросы для вечера вдвоём.",
@@ -108,7 +108,7 @@ function deck(S, g) {
   const list = DECKS[g.id], n = list.length, i = g.idx;
   if (i >= n) return `<section class="card center-card"><h2>${t("Колода закончилась")}</h2><button class="btn primary" data-act="deck-restart">${t("Начать сначала")}</button></section>`;
   const card = list[g.order[i]];
-  const part = g.id === "questions36" ? `<span class="chip">${t("Часть {n} из 3", { n: Math.floor(i / 12) + 1 })}</span>` : "";
+  const part = DECK_PARTS[g.id] ? `<span class="chip">${t("Часть {n} из {total}", { n: partOf(g.id, i), total: DECK_PARTS[g.id].length })}</span>` : "";
   return `<section class="card deck-card">${part}<p class="deck-q">${esc(pick(card, lang()))}</p>
       <p class="muted small">${t("Читайте вслух и отвечайте по очереди.")} ${i + 1} / ${n}</p></section>
     <div class="row"><button class="btn" data-act="deck-prev" ${i ? "" : "disabled"}>${t("Назад")}</button>
