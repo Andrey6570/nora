@@ -1,0 +1,28 @@
+name: Diagnose push
+
+# Run by hand. Prints counts and error codes about push notifications on the live project (no tokens, no names).
+on:
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: functions/package-lock.json
+      - run: cd functions && npm ci
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - uses: google-github-actions/setup-gcloud@v2
+      - name: Diagnose
+        env:
+          GOOGLE_CLOUD_PROJECT: nora-d2fdf
+          NODE_PATH: ${{ github.workspace }}/functions/node_modules
+        run: |
+          cp tools/diagnose-push.mjs functions/diagnose-push.mjs
+          node functions/diagnose-push.mjs
