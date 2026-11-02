@@ -158,6 +158,9 @@ const actions = {
   }, "Сохранено"),
   "delete-task": el => run(async () => { await store.deleteTask(el.dataset.id); ui.sheet = null; }, "Дело удалено"),
   packs: () => { ui.err = ""; ui.sheet = { type: "packs", picked: new Set() }; render(); },
+  // ---- notifications ----
+  "push-enable": () => store.registerDevice(getLang(), pushToast, { ask: true }),
+  "push-test": () => run(() => store.testPush(), "Тест отправлен. Подождите несколько секунд."),
   // ---- the pet ----
   "pet-kind": el => {
     const k = el.dataset.id, d = ui.petDraft || (ui.petDraft = {});
@@ -293,6 +296,7 @@ setLang(getLang());
 applyTheme();
 try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render()); } catch (e) {}
 let registered = false;
+const pushToast = m => toast([m.title, m.body].filter(Boolean).join(": "), 4000);
 function afterRender() {
   // a new growth stage is announced once, by the pet
   if (store && S.user && S.pair && S.pair.pet && ui.grew == null) {
@@ -303,13 +307,18 @@ function afterRender() {
   // ask for the notification permission once, when the pair is open
   if (store && !registered && S.user && S.pair && !S.pair.loading) {
     registered = true;
-    store.registerDevice(getLang(), m => toast([m.title, m.body].filter(Boolean).join(": "), 4000));
+    // a moment after the screen is up: asking for the permission while the app is still opening can be ignored by Android
+    setTimeout(() => store.registerDevice(getLang(), pushToast, { ask: true }), 1500);
   }
 }
 if (store) store.start(() => { render(); afterRender(); });
 render();
 if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
-  import("@capacitor/app").then(({ App }) => App.addListener("backButton", ({ canGoBack }) => {
-    if (ui.sheet) actions.close(); else if (ui.game) actions["game-back"](); else if (ui.tab !== "tasks") { ui.tab = "tasks"; render(); } else App.exitApp();
-  })).catch(() => {});
+  import("@capacitor/app").then(({ App }) => {
+    App.addListener("backButton", ({ canGoBack }) => {
+      if (ui.sheet) actions.close(); else if (ui.game) actions["game-back"](); else if (ui.tab !== "tasks") { ui.tab = "tasks"; render(); } else App.exitApp();
+    });
+    // back from the phone's settings or from another app: look again at the notification permission
+    App.addListener("resume", () => { if (store && store.refreshPush) store.refreshPush(); });
+  }).catch(() => {});
 }

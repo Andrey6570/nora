@@ -7,7 +7,7 @@ import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
 import { newInviteCode, normCode, dayKey, logCutoff, uid as newId } from "./domain.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, error: "" };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, push: { status: "unknown", error: "", saved: false, saveError: "", device: null }, error: "" };
 
 let notify = () => {};
 let unsubs = [];
@@ -51,6 +51,7 @@ function watchPair(pid) {
   unsubs.push(onSnapshot(collection(db, ...base, "results"), s => { M.results = new Map(rows(s).map(r => [r.id, r])); notify(); }, onErr));
   unsubs.push(onSnapshot(collection(db, ...base, "coupons"), s => { M.coupons = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify(); }, onErr));
   unsubs.push(onSnapshot(doc(db, ...base, "progress", "intimacy30"), s => { M.progress = s.exists() ? s.data() : null; notify(); }, () => {}));
+  unsubs.push(onSnapshot(doc(db, ...base, "devices", deviceId()), snap => { M.push.device = snap.exists() ? snap.data() : null; if (snap.exists() && snap.data().token) M.push.saved = true; notify(); }, () => {}));
   unsubs.push(onSnapshot(collection(db, ...base, "orders"), s => { M.orders = rows(s); notify(); }, onErr));
   unsubs.push(onSnapshot(query(collection(db, ...base, "signals"), where("day", ">=", logCutoff(dayKey()))), s => {
     M.signals = rows(s).sort((a, b) => (b.at || 0) - (a.at || 0)); notify();
@@ -107,23 +108,39 @@ export const deleteCoupon = id => deleteDoc(doc(db, "pairs", M.pair.id, "coupons
 export const saveProgress = p => setDoc(doc(db, "pairs", M.pair.id, "progress", "intimacy30"), { start: p.start, done: p.done });
 
 // ---- push: this phone's token, so the partner's reactions and signals reach it ----
+// M.push is what the Settings screen shows: status (see push.js), error, whether the token reached the database
+// (saved), why not (saveError) and the device record itself, where the server writes the result of its last send.
 let token = "", deviceLang = "ru", onPushMessage = () => {};
 const LS = { get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch (e) {} } };
 function deviceId() { let id = LS.get("nora-device"); if (!id) { id = newId(); LS.set("nora-device", id); } return id; }
+const deviceRef = () => doc(db, "pairs", M.pair.id, "devices", deviceId());
 async function writeDevice() {
   if (!token || !M.pair || !M.user) return;
-  await setDoc(doc(db, "pairs", M.pair.id, "devices", deviceId()), { uid: me(), token, lang: deviceLang, at: Date.now() });
+  try {
+    await setDoc(deviceRef(), { uid: me(), token, lang: deviceLang, at: Date.now() }, { merge: true });
+    M.push.saved = true; M.push.saveError = "";
+  } catch (e) { M.push.saved = false; M.push.saveError = (e && (e.code || e.message)) || "error"; }
+  notify();
 }
-export async function registerDevice(lang, onMessage) {
-  if (!pushSupported()) return false;
+// Asks for the permission (when ask is true), gets the token and saves it. Safe to call again: it shows the state on the way.
+export async function registerDevice(lang, onMessage, { ask = true } = {}) {
   deviceLang = lang; onPushMessage = onMessage || onPushMessage;
-  return startPush(t => { token = t; writeDevice().catch(() => {}); }, m => onPushMessage(m));
+  if (!pushSupported()) { M.push.status = "unsupported"; notify(); return false; }
+  return startPush({ ask, onToken: t => { token = t; writeDevice(); }, onMessage: m => onPushMessage(m), onState: s => { M.push.status = s.status; M.push.error = s.error; notify(); } });
 }
-export const setDeviceLang = lang => { deviceLang = lang; return writeDevice().catch(() => {}); };
+// After the phone's settings were visited or the app came back: look again without asking, and finish what was missing
+export async function refreshPush() {
+  if (!pushSupported() || !M.pair || !M.user) return;
+  if (M.push.status === "ready" && M.push.saved) return;
+  await registerDevice(deviceLang, null, { ask: false });
+}
+export const setDeviceLang = lang => { deviceLang = lang; return writeDevice(); };
+// The server answers with a notification to this phone and writes the result into the device record
+export const testPush = () => updateDoc(deviceRef(), { test: Date.now() });
 async function unregisterDevice() {
   if (!M.pair || !M.user || !token) return;
-  await deleteDoc(doc(db, "pairs", M.pair.id, "devices", deviceId())).catch(() => {});
-  token = ""; await stopPush();
+  await deleteDoc(deviceRef()).catch(() => {});
+  token = ""; M.push = { status: "unknown", error: "", saved: false, saveError: "", device: null }; await stopPush();
 }
 
 // A reaction to a mark or a warm signal. The server checks it, counts the daily limit and sends the push.

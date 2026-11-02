@@ -48,3 +48,10 @@ const SHOP = {
   approved: { ru: t => `Согласие получено: «${t}»`, en: t => `Agreed: “${t}”`, el: t => `Συμφωνία: «${t}»` }
 };
 export const shopText = (kind, lang, title, cost) => SHOP[kind][lang](title.length > 50 ? title.slice(0, 50) + "…" : title, cost);
+
+// The test notification sent from Settings, to see that the whole chain works
+export const TEST_PUSH = {
+  ru: { title: "Нора", body: "Проверка уведомлений: всё работает! 🦊" },
+  en: { title: "Nora", body: "Notification check: it works! 🦊" },
+  el: { title: "Νόρα", body: "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊" }
+};

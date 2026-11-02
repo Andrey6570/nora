@@ -167,10 +167,11 @@ service cloud.firestore {
 
       // this phone's push token, so the other partner's actions can reach it
       match /devices/{id} {
-        allow read: if false;
+        // each partner sees only their own phones, to show whether notifications are set up; the server writes lastResult
+        allow read: if isMember(pid) && resource.data.uid == me();
         allow create, update: if isMember(pid)
           && request.resource.data.uid == me()
-          && request.resource.data.keys().hasOnly(['uid', 'token', 'lang', 'at'])
+          && request.resource.data.keys().hasOnly(['uid', 'token', 'lang', 'at', 'test', 'lastResult'])
           && request.resource.data.token is string && request.resource.data.lang in ['ru', 'en', 'el'];
         allow delete: if isMember(pid) && resource.data.uid == me();
       }

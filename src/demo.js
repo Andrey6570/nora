@@ -7,7 +7,7 @@ import { wishLevel } from "../functions/gamedata.js";
 import { GAMES } from "../functions/games.js";
 import { DECOR } from "../functions/pet.js";
 
-export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, error: "", demo: true };
+export const M = { ready: false, user: null, profile: null, pair: null, tasks: [], logs: new Map(), logList: [], signals: [], rewards: [], orders: [], answers: new Map(), results: new Map(), coupons: [], progress: null, push: { status: "unsupported", error: "", saved: false, saveError: "", device: null }, error: "", demo: true };
 let notify = () => {};
 const ME = "me", PARTNER = "partner";
 const sync = () => { M.logList = [...M.logs.values()]; notify(); };
@@ -76,6 +76,7 @@ function award(id, data) {
 
 export function start(onChange) {
   notify = onChange;
+  const k = pushParam(); if (k && PUSH_DEMO[k]) { Object.assign(M.push, PUSH_DEMO[k]); if (M.push.device) M.push.device.lastResult.at = Date.now() - 90000; }
   seed(new URLSearchParams(location.search).get("demo") || "full");
   M.ready = true; notify();
 }
@@ -171,7 +172,13 @@ export async function addCoupon(title) { M.coupons.unshift({ id: uid(), from: ME
 export async function useCoupon(id) { const c = M.coupons.find(x => x.id === id); if (c) c.used = true; notify(); }
 export async function deleteCoupon(id) { M.coupons = M.coupons.filter(c => c.id !== id); notify(); }
 export async function saveProgress(p) { M.progress = { start: p.start, done: p.done }; notify(); }
-export async function registerDevice() { return false; }
+// The browser has no push; ?push=ready|denied|error|prompt|asking shows how Settings looks in each state
+const PUSH_DEMO = { ready: { status: "ready", saved: true, device: { lastResult: { ok: true, code: "", at: 0 } } }, denied: { status: "denied" }, prompt: { status: "prompt" }, asking: { status: "asking" },
+  error: { status: "error", error: "SERVICE_NOT_AVAILABLE" }, notsaved: { status: "ready", saveError: "permission-denied" } };
+const pushParam = () => new URLSearchParams(location.search).get("push");
+export async function registerDevice() { const k = pushParam(); if (k && PUSH_DEMO[k]) Object.assign(M.push, PUSH_DEMO[k]); notify(); return false; }
+export async function refreshPush() {}
+export async function testPush() { M.push.device = { lastResult: { ok: true, code: "", at: Date.now() } }; notify(); }
 export async function setDeviceLang() {}
 export async function claim(view, stage, together) {
   if (M.logs.has(stage.id)) throw { code: "already-exists" };

@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated, onAnswerCreated } from "../handlers.js";
+import { onLogCreated, onLogDeleted, onPairUpdated, onSignalCreated, onOrderCreated, onOrderUpdated, onAnswerCreated, onDeviceUpdated } from "../handlers.js";
 import * as G from "../gamedata.js";
 import { stageOf, flamePatch, flameNow, prevDay, traitOf, MILESTONES, DECOR, DECOR_NAMES, STAGES } from "../pet.js";
 const { wishLevel } = G;
@@ -453,4 +453,38 @@ test("the last cards of the 100 work: item 99 of guess and of wishes", async () 
   const w = ans("wishes", 99, "a", { v: "yes" }), x = ans("wishes", 99, "b", { v: "yes" });
   assert.equal((await answer({ [`pairs/p/answers/${idOf(w)}`]: w }, x)).res, "match");
   assert.equal((await answer({}, ans("wishes", 100, "a", { v: "yes" }))).res, "bad-answer");
+});
+
+// ---- push diagnostics ----
+test("every send is recorded on the device: ok, or the error code", async () => {
+  const db = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/signals/s": sig }), messaging = fakeMessaging();
+  await onSignalCreated({ db, messaging, now }, { pid: "p", id: "s", data: sig });
+  assert.deepEqual([db.docs.get("pairs/p/devices/d1").lastResult.ok, db.docs.get("pairs/p/devices/d2").lastResult.ok], [true, true]);
+  assert.equal(db.docs.get("pairs/p/devices/d3").lastResult, undefined); // the sender's own phone is not messaged
+  // another failure than a dead token: kept, with the code, and logged
+  const failing = { sent: [], sendEachForMulticast: async m => ({ responses: m.tokens.map(() => ({ success: false, error: { code: "messaging/third-party-auth-error" } })) }) };
+  const db2 = fakeDb({ "pairs/p": sigPair, ...devs, "pairs/p/signals/s": sig }), logged = [], orig = console.error;
+  console.error = (...a) => logged.push(a.join(" "));
+  try { await onSignalCreated({ db: db2, messaging: failing, now }, { pid: "p", id: "s", data: sig }); } finally { console.error = orig; }
+  assert.deepEqual(db2.docs.get("pairs/p/devices/d1").lastResult.code, "messaging/third-party-auth-error");
+  assert.equal(db2.docs.has("pairs/p/devices/d1"), true);
+  assert.equal(logged.length, 2);
+});
+
+test("a test request sends one notification to that phone in its language and records the result", async () => {
+  const dev = { uid: "b", token: "T1", lang: "el", at: 1 };
+  const db = fakeDb({ "pairs/p": sigPair, "pairs/p/devices/d1": { ...dev, test: 5 } }), messaging = fakeMessaging();
+  assert.equal(await onDeviceUpdated({ db, messaging }, { pid: "p", id: "d1", before: dev, after: { ...dev, test: 5 } }), "sent");
+  assert.deepEqual(messaging.sent.map(m => [m.tokens, m.notification.title, m.notification.body]), [[["T1"], "Νόρα", "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊"]]);
+  assert.equal(db.docs.get("pairs/p/devices/d1").lastResult.ok, true);
+  // writing the result back (test unchanged), a missing token or no request: nothing is sent
+  const same = { ...dev, test: 5 };
+  assert.equal(await onDeviceUpdated({ db, messaging }, { pid: "p", id: "d1", before: same, after: { ...same, lastResult: { ok: true } } }), "ignored");
+  assert.equal(await onDeviceUpdated({ db, messaging }, { pid: "p", id: "d1", before: dev, after: dev }), "ignored");
+  assert.equal(await onDeviceUpdated({ db, messaging }, { pid: "p", id: "d1", before: {}, after: { uid: "b", test: 9 } }), "ignored");
+  assert.equal(messaging.sent.length, 1);
+  // a failed test says why
+  const bad = { sendEachForMulticast: async () => ({ responses: [{ success: false, error: { code: "messaging/invalid-argument" } }] }) };
+  assert.equal(await onDeviceUpdated({ db, messaging: bad }, { pid: "p", id: "d1", before: dev, after: { ...dev, test: 6 } }), "failed");
+  assert.equal(db.docs.has("pairs/p/devices/d1"), false); // a token Google calls invalid is removed, so the app registers again
 });

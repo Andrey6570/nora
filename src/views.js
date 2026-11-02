@@ -257,6 +257,34 @@ function usTab(S, ui) {
     </section>`;
 }
 
+// ---- notifications: what the phone and the server say, and what to do about it ----
+const NATIVE_ONLY = "unsupported";
+export const pushOk = P => P && P.status === "ready" && P.saved;
+function pushCard(S) {
+  const P = S.push || { status: "unsupported" }, st = P.status, d = P.device, last = d && d.lastResult;
+  let line, btn = "";
+  if (st === NATIVE_ONLY) line = t("Уведомления работают в приложении для Android.");
+  else if (pushOk(P)) line = "✅ " + t("Уведомления включены на этом телефоне");
+  else if (st === "ready") { line = t("Токен получен, но не сохранён: {x}", { x: esc(P.saveError || "?") }); btn = "push-enable"; }
+  else if (["checking", "asking", "registering"].includes(st)) line = "⏳ " + t("Идёт настройка…");
+  else if (st === "denied") { line = "❌ " + t("Разрешение отклонено. Откройте «Настройки» телефона → «Приложения» → «Нора» → «Уведомления», включите их и вернитесь сюда."); btn = "push-enable"; }
+  else if (st === "error") { line = "⚠️ " + t("Не получилось включить: {x}", { x: esc(P.error || "?") }); btn = "push-enable"; }
+  else { line = t("Разрешение ещё не запрошено. Нажмите кнопку, и телефон спросит."); btn = "push-enable"; }
+  const result = last ? `<p class="muted small">${t("Последняя отправка сервера")}: ${last.ok ? "✅ " + t("доставлено в Google") : "❌ " + esc(last.code || "?")}</p>` : "";
+  return `<section class="card"><h2>${t("Уведомления")}</h2><p class="${pushOk(P) ? "" : "muted"}">${line}</p>
+    ${btn ? `<button class="btn primary" data-act="${btn}">${st === "denied" || st === "error" || st === "ready" ? t("Проверить снова") : t("Включить уведомления")}</button>` : ""}
+    ${pushOk(P) ? `<button class="btn" data-act="push-test">${t("Отправить тестовое уведомление")}</button>
+      <p class="muted small">${t("Придёт на этот телефон. Если не пришло, отключите для «Нора» экономию заряда: Настройки → Приложения → Нора → Батарея.")}</p>` : ""}
+    ${result}</section>`;
+}
+function pushBanner(S) {
+  const P = S.push;
+  if (!P || P.status === NATIVE_ONLY || pushOk(P) || ["checking", "asking", "registering"].includes(P.status)) return "";
+  return `<section class="card invite"><h2>🔔 ${t("Включите уведомления")}</h2>
+    <p class="muted">${t("Тогда тёплые слова и реакции партнёра будут приходить сразу, даже если приложение закрыто.")}</p>
+    <button class="btn primary" data-act="push-enable">${t("Включить уведомления")}</button></section>`;
+}
+
 function ago(at) {
   const min = Math.max(0, Math.round((Date.now() - at) / 60000));
   if (min < 1) return t("только что");
@@ -280,7 +308,7 @@ function warmthTab(S) {
     return `<li class="${mine ? "mine" : ""}"><b>${esc(who)}</b><span>${text}</span><small>${esc(ago(sg.at || 0))}</small></li>`;
   };
   const recent = (S.signals || []).slice(0, 25);
-  return `${alone ? invite(p) : ""}
+  return `${alone ? invite(p) : ""}${pushBanner(S)}
     <section class="card"><h2>${t("Тёплые слова")}</h2>
       <p class="muted">${alone ? t("Когда партнёр присоединится, здесь можно будет отправлять тёплые слова одним нажатием.")
         : t("Одно нажатие, и партнёр получит уведомление. Осталось сегодня: {n}", { n: left })}</p>
@@ -298,6 +326,7 @@ function settingsTab(S, ui) {
   return `<section class="card"><h2>${t("Профиль")}</h2>
       <label class="field"><span>${t("Имя")}</span><input data-field="name" maxlength="40" value="${esc(ui.name)}"></label>
       <button class="btn" data-act="save-name">${t("Сохранить")}</button></section>
+    ${pushCard(S)}
     <section class="card"><h2>${t("Язык")}</h2>${langChips()}</section>
     <section class="card"><h2>${t("Тема")}</h2>${seg("theme", [["system", "Как в системе"], ["light", "Светлая"], ["dark", "Тёмная"]], ui.theme)}</section>
     <section class="card"><h2>${t("Экономика звёзд")}</h2>

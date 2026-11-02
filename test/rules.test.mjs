@@ -105,13 +105,22 @@ test("signals: from me, a known shape, never changed or deleted by clients", asy
   await assertFails(updateDoc(doc(as("a"), "pairs/p"), { "sigDay.a": { day: "x", message: 0, reaction: 0 } }));
 });
 
-test("devices: own token only, not readable from the app, deleted by the owner", async () => {
+test("devices: own token only, a partner never sees it, own record readable, test request and merge allowed", async () => {
   await seed(db => setDoc(doc(db, "pairs/p"), pairDoc(["a", "b"])));
   const dev = { uid: "a", token: "tok", lang: "el", at: 1 };
   await assertSucceeds(setDoc(doc(as("a"), "pairs/p/devices/d1"), dev));
   await assertFails(setDoc(doc(as("b"), "pairs/p/devices/d2"), dev));
   await assertFails(setDoc(doc(as("a"), "pairs/p/devices/d3"), { ...dev, lang: "fr" }));
-  await assertFails(getDoc(doc(as("a"), "pairs/p/devices/d1")));
+  await assertFails(setDoc(doc(as("a"), "pairs/p/devices/d4"), { ...dev, extra: 1 }));
+  // the app reads its own record to show the state of notifications, the partner's phone is invisible
+  await assertSucceeds(getDoc(doc(as("a"), "pairs/p/devices/d1")));
+  await assertFails(getDoc(doc(as("b"), "pairs/p/devices/d1")));
+  await assertFails(getDoc(doc(as("x"), "pairs/p/devices/d1")));
+  // a test request, and saving again with merge after the server wrote lastResult
+  await assertSucceeds(updateDoc(doc(as("a"), "pairs/p/devices/d1"), { test: 5 }));
+  await seed(db => updateDoc(doc(db, "pairs/p/devices/d1"), { lastResult: { ok: true, code: "", at: 9 } }));
+  await assertSucceeds(setDoc(doc(as("a"), "pairs/p/devices/d1"), { ...dev, token: "new" }, { merge: true }));
+  await assertFails(updateDoc(doc(as("b"), "pairs/p/devices/d1"), { test: 6 }));
   await assertFails(deleteDoc(doc(as("b"), "pairs/p/devices/d1")));
   await assertSucceeds(deleteDoc(doc(as("a"), "pairs/p/devices/d1")));
 });

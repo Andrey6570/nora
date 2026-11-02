@@ -2,7 +2,7 @@
 // deps: { db, now } — an Admin Firestore instance (or a fake with the same surface) and the current time.
 import { FieldValue } from "firebase-admin/firestore";
 import { stageStars, togetherStars, parseLogId, periodKey } from "./economy.js";
-import { isKnown, pushText, shopText, LIMITS } from "./signals.js";
+import { isKnown, pushText, shopText, LIMITS, TEST_PUSH } from "./signals.js";
 import { GAMES, isPaidGame, gameName, isUnlocked } from "./games.js";
 import { GUESS_OPTIONS, WISHES, WISH_ANSWERS, wishLevel } from "./gamedata.js";
 import { flamePatch, DECOR, decorName } from "./pet.js";
@@ -31,9 +31,30 @@ async function pushTo({ db, messaging }, pid, uid, title, build) {
       tokens: group.map(d => d.token), notification: { title, body: build(lang) },
       android: { priority: "high", notification: { channelId: "default" } }
     });
-    await Promise.all(res.responses.map((r, i) => (!r.success && r.error && DEAD.includes(r.error.code)) ? group[i].ref.delete() : null));
+    await recordResults(res.responses, group);
   }
   return list.length;
+}
+
+// Remember how each send went on the device record (the app shows it in Settings), drop devices whose token is dead
+// and log failures so they show up in the function logs.
+async function recordResults(responses, group) {
+  await Promise.all(responses.map((r, i) => {
+    const code = r.success ? "" : (r.error && r.error.code) || "unknown";
+    if (!r.success) console.error("push failed:", code);
+    if (!r.success && DEAD.includes(code)) return group[i].ref.delete();
+    return group[i].ref.update({ lastResult: { ok: !!r.success, code, at: Date.now() } }).catch(() => {});
+  }));
+}
+
+// The app asked for a test: the device record got a new "test" value. Send one notification to that phone.
+export async function onDeviceUpdated({ db, messaging }, { pid, id, before, after }) {
+  if (!after || !after.token || !after.test || (before && before.test === after.test)) return "ignored";
+  const ref = db.doc(`pairs/${pid}/devices/${id}`);
+  const lang = LANGS.includes(after.lang) ? after.lang : "en", t = TEST_PUSH[lang];
+  const res = await messaging.sendEachForMulticast({ tokens: [after.token], notification: t, android: { priority: "high", notification: { channelId: "default" } } });
+  await recordResults(res.responses, [{ ref }]);
+  return res.responses[0].success ? "sent" : "failed";
 }
 
 // A partner sent a reaction or a warm signal: check it against the catalogue and the daily limit,

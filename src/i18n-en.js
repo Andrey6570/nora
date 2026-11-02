@@ -312,5 +312,22 @@ export const EN = {
   "🌆 Вне дома": "🌆 Away from home",
   "🏠 Дома": "🏠 At home",
   "🏠🌆 Дома или вне дома": "🏠🌆 At home or away",
-  "💸 С расходами": "💸 With spending"
+  "💸 С расходами": "💸 With spending",
+  "Включите уведомления": "Turn on notifications",
+  "Включить уведомления": "Turn on notifications",
+  "Идёт настройка…": "Setting up…",
+  "Не получилось включить: {x}": "Could not turn on: {x}",
+  "Отправить тестовое уведомление": "Send a test notification",
+  "Последняя отправка сервера": "The server's last send",
+  "Придёт на этот телефон. Если не пришло, отключите для «Нора» экономию заряда: Настройки → Приложения → Нора → Батарея.": "It arrives on this phone. If it does not, turn off battery saving for Nora: Settings → Apps → Nora → Battery.",
+  "Проверить снова": "Check again",
+  "Разрешение ещё не запрошено. Нажмите кнопку, и телефон спросит.": "Permission has not been asked yet. Tap the button and the phone will ask.",
+  "Разрешение отклонено. Откройте «Настройки» телефона → «Приложения» → «Нора» → «Уведомления», включите их и вернитесь сюда.": "Permission was declined. Open the phone's Settings → Apps → Nora → Notifications, turn them on and come back here.",
+  "Тест отправлен. Подождите несколько секунд.": "Test sent. Wait a few seconds.",
+  "Тогда тёплые слова и реакции партнёра будут приходить сразу, даже если приложение закрыто.": "Then your partner's warm words and reactions arrive at once, even when the app is closed.",
+  "Токен получен, но не сохранён: {x}": "The token was received but not saved: {x}",
+  "Уведомления": "Notifications",
+  "Уведомления включены на этом телефоне": "Notifications are on for this phone",
+  "Уведомления работают в приложении для Android.": "Notifications work in the Android app.",
+  "доставлено в Google": "handed over to Google"
 };
