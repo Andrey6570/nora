@@ -329,5 +329,7 @@ export const EN = {
   "Уведомления": "Notifications",
   "Уведомления включены на этом телефоне": "Notifications are on for this phone",
   "Уведомления работают в приложении для Android.": "Notifications work in the Android app.",
-  "доставлено в Google": "handed over to Google"
+  "доставлено в Google": "handed over to Google",
+  "Прозрачность стекла": "Glass transparency",
+  "Меньше — прозрачнее, больше — плотнее.": "Lower is more transparent, higher is more solid."
 };

@@ -329,6 +329,9 @@ function settingsTab(S, ui) {
     ${pushCard(S)}
     <section class="card"><h2>${t("Язык")}</h2>${langChips()}</section>
     <section class="card"><h2>${t("Тема")}</h2>${seg("theme", [["system", "Как в системе"], ["light", "Светлая"], ["dark", "Тёмная"]], ui.theme)}</section>
+    <section class="card"><h2>${t("Прозрачность стекла")}</h2>
+      <input type="range" min="0" max="100" step="1" data-field="glass" value="${ui.glass}" aria-label="${t("Прозрачность стекла")}">
+      <p class="muted small">${t("Меньше — прозрачнее, больше — плотнее.")}</p></section>
     <section class="card"><h2>${t("Экономика звёзд")}</h2>
       <p class="muted">${t("Сколько минут работы стоит одна звезда. Меняет цену будущих отметок, заработанное не пересчитывается.")}</p>
       ${seg("scale", [5, 10, 15, 20, 30].map(n => [n, t("{n} мин", { n })]), p.scale || 10)}</section>
@@ -348,12 +351,14 @@ function settingsTab(S, ui) {
 
 const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "💌", "Тепло"], ["games", "🎲", "Игры"], ["settings", "⚙️", "Настройки"]];
 
+const TAB_TITLE = id => (TABS.find(x => x[0] === id) || TABS[0])[2];
+
 export function main(S, ui) {
   if (ui.game) return gameScreen(S, ui) + (ui.sheet ? sheet(S, ui) : "");
   const body = ui.tab === "us" ? usTab(S, ui) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "games" ? ((S.pair.members || []).length < 2 ? invite(S.pair) : "") + gamesTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
   const unseen = ui.tab === "warm" ? 0 : unseenSignals(S.signals || [], S.user.uid, ui.seenAt || 0);
-  return `<header class="top"><span class="brand">${markSvg(30)}<b>${t("Нора")}</b></span>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
-    <main class="page">${body}${err(ui)}</main>
+  return `<header class="top"><span class="brand">${markSvg(30)}<b>${t("Нора")}</b></span><span class="nav-title">${t(TAB_TITLE(ui.tab))}</span>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
+    <main class="page"><h1 class="large-title">${t(TAB_TITLE(ui.tab))}</h1>${body}${err(ui)}</main>
     <nav class="tabs">${TABS.map(([id, icon, label]) =>
       `<button class="${ui.tab === id ? "on" : ""}" data-act="tab" data-v="${id}" aria-current="${ui.tab === id}"><span>${icon}${id === "warm" && unseen ? `<i class="dot" aria-label="${unseen}">${unseen}</i>` : ""}</span>${t(label)}</button>`).join("")}</nav>
     ${ui.sheet ? sheet(S, ui) : ""}`;

@@ -18,7 +18,7 @@ const THEME_KEY = "nora-theme", SEEN_KEY = "nora-seen-signals";
 const NEW_REWARD = () => ({ title: "", cost: 20, scope: "personal" });
 const NEW_TASK = () => ({ title: "", minutes: 15, difficulty: 1, repeat: "once", full: true });
 
-const ui = { game: null, seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system" };
+const ui = { game: null, seenAt: Number(LS.get(SEEN_KEY)) || 0, tab: "tasks", sheet: null, welcome: "choose", name: "", code: "", consent: false, err: "", busy: false, theme: LS.get(THEME_KEY) || "system", glass: glassInit() };
 
 // ---------- messages ----------
 function errText(e) {
@@ -44,6 +44,14 @@ async function run(fn, okMsg) {
   try { await fn(); if (okMsg) toast(t(okMsg)); } catch (e) { ui.err = errText(e); }
   ui.busy = false; render();
 }
+
+// ---------- glass ----------
+function glassInit() { const n = Number(LS.get("nora-glass")); return Number.isFinite(n) && LS.get("nora-glass") !== null && LS.get("nora-glass") !== "" ? Math.min(100, Math.max(0, n)) : 62; }
+function applyGlass() { document.documentElement.style.setProperty("--glass", String(ui.glass / 100)); }
+window.addEventListener("scroll", () => {
+  const on = (window.scrollY || document.documentElement.scrollTop) > 40;
+  if (on !== ("scrolled" in document.documentElement.dataset)) { if (on) document.documentElement.dataset.scrolled = ""; else delete document.documentElement.dataset.scrolled; }
+}, { passive: true });
 
 // ---------- theme ----------
 function applyTheme() {
@@ -87,6 +95,7 @@ function setField(name, value) {
 }
 document.addEventListener("input", e => {
   const f = e.target.dataset.field; if (!f) return;
+  if (f === "glass") { ui.glass = Number(e.target.value); LS.set("nora-glass", String(ui.glass)); applyGlass(); return; }
   const v = e.target.type === "checkbox" ? e.target.checked : e.target.tagName === "SELECT" || e.target.type === "number" ? Number(e.target.value) : e.target.value;
   setField(f, v);
   // the star preview depends on these
@@ -294,6 +303,7 @@ document.addEventListener("keydown", e => { if (e.key === "Escape") { if (ui.she
 // ---------- start ----------
 setLang(getLang());
 applyTheme();
+applyGlass();
 try { matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => render()); } catch (e) {}
 let registered = false;
 const pushToast = m => toast([m.title, m.body].filter(Boolean).join(": "), 4000);
