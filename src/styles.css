@@ -358,3 +358,8 @@ html[data-scrolled] .nav-title { opacity: 1; transform: none; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* Sign in with Apple: black/white per Apple's guidelines */
+.btn.apple { background: #000; color: #fff; border: 0; }
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .btn.apple { background: #fff; color: #000; } }
+:root[data-theme="dark"] .btn.apple { background: #fff; color: #000; }

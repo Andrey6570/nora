@@ -14,3 +14,4 @@ android/app/upload.jks
 
 # public legal pages, built from src/legal.js by tools/build-legal.mjs
 hosting/
+ios/App/App/GoogleService-Info.plist

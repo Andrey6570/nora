@@ -1,7 +1,7 @@
 // Live data from Firestore plus every write the app makes. Stars are never written here: the server awards them.
 import { onAuthStateChanged, deleteUser } from "firebase/auth";
 import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, deleteField } from "firebase/firestore";
-import { auth, db, googleSignIn, appSignOut } from "./fb.js";
+import { auth, db, googleSignIn, appleSignIn, reSignIn, appSignOut } from "./fb.js";
 import { startPush, stopPush, pushSupported } from "./push.js";
 import { POLICY_VERSION } from "./config.js";
 import { DEFAULT_SCALE } from "../functions/economy.js";
@@ -78,6 +78,7 @@ export function start(onChange) {
 }
 
 export const signIn = () => googleSignIn();
+export const signInApple = () => appleSignIn();
 export async function signOutAll() { await unregisterDevice(); stopPair(); await appSignOut(); }
 
 // ---- the shop ----
@@ -201,7 +202,7 @@ export async function leavePair() {
 // Google asks for a fresh sign-in before an account can be deleted, so we sign in again first.
 export async function deleteAccount() {
   const uid = me(), pid = M.pair && M.pair.id;
-  const cred = await googleSignIn();
+  const cred = await reSignIn();
   if (cred.user.uid !== uid) throw { code: "other-account" };
   await unregisterDevice();
   stopPair();

@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithCredential, signOut } from "firebase/auth";
+import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithCredential, signOut } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 import { firebaseConfig } from "./config.js";
@@ -17,6 +17,23 @@ export async function googleSignIn() {
     return signInWithCredential(auth, cred);
   }
   return signInWithPopup(auth, new GoogleAuthProvider());
+}
+
+export const isIOS = () => Capacitor.getPlatform() === "ios";
+
+// Sign in with Apple (App Store guideline 4.8): native sheet, then the Apple credential is handed to Firebase.
+export async function appleSignIn() {
+  const { FirebaseAuthentication } = await import("@capacitor-firebase/authentication");
+  const res = await FirebaseAuthentication.signInWithApple({ skipNativeAuth: true });
+  const c = res.credential || {};
+  const cred = new OAuthProvider("apple.com").credential({ idToken: c.idToken, rawNonce: c.nonce });
+  return signInWithCredential(auth, cred);
+}
+
+// Fresh sign-in with whichever provider the current account uses (needed before deleting the account).
+export function reSignIn() {
+  const ids = ((auth.currentUser && auth.currentUser.providerData) || []).map(x => x.providerId);
+  return ids.includes("apple.com") ? appleSignIn() : googleSignIn();
 }
 
 export async function appSignOut() {

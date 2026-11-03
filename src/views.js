@@ -5,6 +5,7 @@ import { GAMES } from "../functions/games.js";
 import { PET_KINDS, DECOR, decorName } from "../functions/pet.js";
 import { petView, phraseFor, MOOD_ICON } from "./pet.js";
 import { STAGE_NAMES, DEFAULT_NAMES, KIND_NAMES, TRAIT_TEXT, MILESTONE_TEXT } from "./petdata.js";
+import { isIOS } from "./fb.js";
 import { gamesTab, gameScreen, gameTitle } from "./gameviews.js";
 import { REACTIONS, MESSAGES, messageText } from "../functions/signals.js";
 import { stageStars } from "../functions/economy.js";
@@ -35,6 +36,7 @@ export function signIn(ui) {
     <h1>${t("Нора")}</h1>
     <p class="lead">${t("Дом — общее дело. Игра для двоих о быте и заботе друг о друге.")}</p>
     <button class="btn primary big" data-act="signin" ${ui.busy ? "disabled" : ""}>${t("Войти через Google")}</button>
+    ${isIOS() ? `<button class="btn big apple" data-act="signin-apple" ${ui.busy ? "disabled" : ""}> ${t("Войти через Apple")}</button>` : ""}
     ${err(ui)}
     <div class="foot">${langChips()}</div>
     ${docLinks()}

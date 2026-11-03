@@ -331,5 +331,6 @@ export const EN = {
   "Уведомления работают в приложении для Android.": "Notifications work in the Android app.",
   "доставлено в Google": "handed over to Google",
   "Прозрачность стекла": "Glass transparency",
-  "Меньше — прозрачнее, больше — плотнее.": "Lower is more transparent, higher is more solid."
+  "Меньше — прозрачнее, больше — плотнее.": "Lower is more transparent, higher is more solid.",
+  "Войти через Apple": "Sign in with Apple"
 };

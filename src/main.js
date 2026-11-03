@@ -114,6 +114,7 @@ function saveDeck() { LS.set(deckKey(ui.game.id), String(ui.game.idx)); }
 const actions = {
   demo: () => { location.search = "?demo"; },
   signin: () => run(() => store.signIn()),
+  "signin-apple": () => run(() => store.signInApple()),
   signout: () => run(async () => { ui.sheet = null; ui.tab = "tasks"; await store.signOutAll(); }),
   welcome: el => { ui.welcome = el.dataset.v; ui.err = ""; render(); },
   create: () => run(async () => {

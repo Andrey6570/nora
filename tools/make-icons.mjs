@@ -126,6 +126,12 @@ await png(iconSvg({ size: 512 }), join(PUB, "icon-512.png"), 512);
 await png(iconSvg({ size: 32, scale: 0.98 }), join(PUB, "favicon-32.png"), 32);
 track(join(PUB, "*"), "svg + 4 png", "");
 
+// ---- iOS: App Store icon (1024, full square, no alpha: Apple rounds it) and the launch image ----
+const IOS = join(ROOT, "ios/App/App/Assets.xcassets");
+await png(squareSvg(1024, 0.9), join(IOS, "AppIcon.appiconset/AppIcon-512@2x.png"), 1024);
+for (const f of ["splash-2732x2732.png", "splash-2732x2732-1.png", "splash-2732x2732-2.png"]) await png(splashSvg(2732, 2732), join(IOS, "Splash.imageset", f), 2732, 2732);
+track(join(IOS, "*"), "icon 1024 + splash", "");
+
 // ---- branding for the stores and for people who write about the app ----
 const BR = join(ROOT, "branding");
 out(join(BR, "logo-mark.svg"), markSvg(512, "Nora"));

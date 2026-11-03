@@ -1,0 +1,112 @@
+name: iOS build
+
+# Manual only: macOS runner minutes cost 10x Linux minutes.
+on:
+  workflow_dispatch:
+    inputs:
+      signed:
+        description: "Also build a signed IPA and upload it to TestFlight (needs the Apple secrets, see README)"
+        type: boolean
+        default: false
+
+jobs:
+  simulator:
+    # An unsigned build for the iOS Simulator: proves the project compiles. It cannot be installed on a real iPhone.
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - run: npm test
+      - name: Firebase config for iOS (optional)
+        env: { PLIST: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}" }
+        run: |
+          if [ -n "$PLIST" ]; then echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist; else echo "no GoogleService-Info.plist secret: Google/Apple sign-in will not work in this build"; fi
+      - run: |
+          npx vite build
+          npx cap sync ios
+      - name: Build for the simulator
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+            -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath build CODE_SIGNING_ALLOWED=NO build | tail -30
+      - run: cd build/Build/Products/Debug-iphonesimulator && zip -qr "$GITHUB_WORKSPACE/Nora-simulator.zip" App.app
+      - uses: actions/upload-artifact@v4
+        with: { name: Nora-ios-simulator, path: Nora-simulator.zip }
+
+  testflight:
+    if: ${{ inputs.signed }}
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Check the Apple secrets
+        env:
+          A: "${{ secrets.IOS_CERT_P12_B64 }}"
+          B: "${{ secrets.IOS_CERT_PASSWORD }}"
+          C: "${{ secrets.IOS_PROFILE_B64 }}"
+          D: "${{ secrets.ASC_KEY_ID }}"
+          E: "${{ secrets.ASC_ISSUER_ID }}"
+          F: "${{ secrets.ASC_KEY_P8 }}"
+          G: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}"
+          T: "${{ secrets.APPLE_TEAM_ID }}"
+        run: |
+          for v in A B C D E F G T; do [ -n "${!v}" ] || { echo "::error::a required Apple secret is missing (see README, iOS section)"; exit 1; }; done
+      - name: Install certificate and profile
+        env:
+          CERT: "${{ secrets.IOS_CERT_P12_B64 }}"
+          PASS: "${{ secrets.IOS_CERT_PASSWORD }}"
+          PROFILE: "${{ secrets.IOS_PROFILE_B64 }}"
+          PLIST: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}"
+        run: |
+          echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist
+          KC="$RUNNER_TEMP/build.keychain"
+          security create-keychain -p "ci" "$KC"; security set-keychain-settings -lut 21600 "$KC"
+          security unlock-keychain -p "ci" "$KC"; security list-keychains -d user -s "$KC" login.keychain
+          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$PASS" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "ci" "$KC"
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/nora.mobileprovision"
+          UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/nora.mobileprovision")")
+          cp "$RUNNER_TEMP/nora.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
+          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+      - run: |
+          npx vite build
+          npx cap sync ios
+      - name: Archive
+        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}" }
+        run: |
+          xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath build/Nora.xcarchive \
+            CURRENT_PROJECT_VERSION=${{ github.run_number }} \
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE="$PROFILE_UUID" archive | tail -30
+      - name: Export IPA
+        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}" }
+        run: |
+          cat > build/export.plist <<PL
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0"><dict>
+            <key>method</key><string>app-store-connect</string>
+            <key>teamID</key><string>$TEAM</string>
+            <key>signingStyle</key><string>manual</string>
+            <key>provisioningProfiles</key><dict><key>com.andrey6570.nora</key><string>$PROFILE_UUID</string></dict>
+          </dict></plist>
+          PL
+          xcodebuild -exportArchive -archivePath build/Nora.xcarchive -exportPath build/ipa -exportOptionsPlist build/export.plist
+      - uses: actions/upload-artifact@v4
+        with: { name: Nora-ios-ipa, path: build/ipa/*.ipa }
+      - name: Upload to TestFlight
+        env:
+          KID: "${{ secrets.ASC_KEY_ID }}"
+          ISS: "${{ secrets.ASC_ISSUER_ID }}"
+          P8: "${{ secrets.ASC_KEY_P8 }}"
+        run: |
+          mkdir -p ~/.appstoreconnect/private_keys
+          echo "$P8" > ~/.appstoreconnect/private_keys/AuthKey_$KID.p8
+          xcrun altool --upload-app --type ios --file build/ipa/*.ipa --apiKey "$KID" --apiIssuer "$ISS"
