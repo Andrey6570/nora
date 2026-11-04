@@ -1,6 +1,6 @@
 // Live data from Firestore plus every write the app makes. Stars are never written here: the server awards them.
 import { onAuthStateChanged, deleteUser } from "firebase/auth";
-import { collection, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, deleteField } from "firebase/firestore";
+import { collection, doc, getDoc, getDocFromCache, setDoc, addDoc, updateDoc, deleteDoc, query, where, onSnapshot, writeBatch, arrayUnion, arrayRemove, deleteField } from "firebase/firestore";
 import { auth, db, googleSignIn, appleSignIn, reSignIn, appSignOut } from "./fb.js";
 import { startPush, stopPush, pushSupported } from "./push.js";
 import { POLICY_VERSION } from "./config.js";
@@ -67,11 +67,17 @@ export function start(onChange) {
     stopPair();
     M.user = user; M.profile = null; M.error = "";
     if (user) {
-      try {
-        const p = await getDoc(doc(db, "users", user.uid));
-        M.profile = p.exists() ? p.data() : {};
-        if (M.profile.pairId) watchPair(M.profile.pairId);
-      } catch (e) { onErr(e); M.profile = {}; }
+      const ref = doc(db, "users", user.uid);
+      const use = p => { M.profile = p.exists() ? p.data() : {}; if (M.profile.pairId) watchPair(M.profile.pairId); };
+      // the saved copy answers at once; the server is only waited for the very first time (a slow network used to hold the fox screen for many seconds)
+      let cached = null;
+      try { const c = await getDocFromCache(ref); if (c.exists()) cached = c; } catch (e) {}
+      if (cached) {
+        use(cached);
+        getDoc(ref).then(p => { const pid = p.exists() ? p.data().pairId : undefined; if (pid !== M.profile.pairId && M.user === user) { stopPair(); use(p); notify(); } }).catch(() => {});
+      } else {
+        try { use(await getDoc(ref)); } catch (e) { onErr(e); M.profile = {}; }
+      }
     }
     M.ready = true; notify();
   });
