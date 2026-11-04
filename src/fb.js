@@ -1,13 +1,19 @@
 import { initializeApp } from "firebase/app";
-import { getAuth, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithCredential, signOut } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { getAuth, initializeAuth, indexedDBLocalPersistence, browserLocalPersistence, GoogleAuthProvider, OAuthProvider, signInWithPopup, signInWithCredential, signOut } from "firebase/auth";
+import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, persistentSingleTabManager } from "firebase/firestore";
 import { Capacitor } from "@capacitor/core";
 import { firebaseConfig } from "./config.js";
 
 export const configured = !!firebaseConfig.apiKey;
 export const app = configured ? initializeApp(firebaseConfig) : null;
-export const auth = configured ? getAuth(app) : null;
-export const db = configured ? initializeFirestore(app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }) }) : null;
+const native = Capacitor.isNativePlatform();
+// In the phone app (WKWebView) the default setup is slow to start: the web sign-in pop-up resolver loads extra pages, several-tab
+// coordination waits on locks, and Firestore tries its streaming channel first and only falls back to long polling after a timeout.
+export const auth = configured ? (native ? initializeAuth(app, { persistence: [indexedDBLocalPersistence, browserLocalPersistence] }) : getAuth(app)) : null;
+export const db = configured ? initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: native ? persistentSingleTabManager() : persistentMultipleTabManager() }),
+  ...(Capacitor.getPlatform() === "ios" ? { experimentalForceLongPolling: true } : { experimentalAutoDetectLongPolling: true })
+}) : null;
 
 export async function googleSignIn() {
   if (Capacitor.isNativePlatform()) {
