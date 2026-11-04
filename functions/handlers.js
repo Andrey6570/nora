@@ -29,7 +29,7 @@ async function pushTo({ db, messaging }, pid, uid, title, build) {
   for (const [lang, group] of Object.entries(byLang)) {
     const res = await messaging.sendEachForMulticast({
       tokens: group.map(d => d.token), notification: { title, body: build(lang) },
-      android: { priority: "high", notification: { channelId: "default" } }
+      android: { priority: "high", notification: { channelId: "default" } }, apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } }
     });
     await recordResults(res.responses, group);
   }
@@ -52,7 +52,7 @@ export async function onDeviceUpdated({ db, messaging }, { pid, id, before, afte
   if (!after || !after.token || !after.test || (before && before.test === after.test)) return "ignored";
   const ref = db.doc(`pairs/${pid}/devices/${id}`);
   const lang = LANGS.includes(after.lang) ? after.lang : "en", t = TEST_PUSH[lang];
-  const res = await messaging.sendEachForMulticast({ tokens: [after.token], notification: t, android: { priority: "high", notification: { channelId: "default" } } });
+  const res = await messaging.sendEachForMulticast({ tokens: [after.token], notification: t, android: { priority: "high", notification: { channelId: "default" } }, apns: { headers: { "apns-priority": "10" }, payload: { aps: { sound: "default" } } } });
   await recordResults(res.responses, [{ ref }]);
   return res.responses[0].success ? "sent" : "failed";
 }

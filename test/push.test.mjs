@@ -101,3 +101,19 @@ test("a message that arrives while the app is open is passed on", async () => {
   P.listeners.pushNotificationReceived({});
   assert.deepEqual(got, [{ title: "Андрей", body: "Люблю тебя" }, { title: "", body: "" }]);
 });
+
+test("messaging adapter: token and errors reach the listeners, notifications are unwrapped", async () => {
+  const { messagingAdapter } = await import("../src/push.js");
+  const seen = {};
+  const M = (token, fail) => ({ checkPermissions: async () => ({ receive: "granted" }), requestPermissions: async () => ({ receive: "granted" }), removeAllListeners: async () => {},
+    addListener: async (n, f) => { seen[n] = f; }, createChannel: async () => {}, getToken: async () => { if (fail) throw new Error("no apns"); return { token }; }, deleteToken: async () => { seen.deleted = true; } });
+  const a = messagingAdapter(M("FCM-1")), got = [];
+  await a.addListener("registration", t => got.push(t.value));
+  await a.addListener("pushNotificationReceived", n => got.push(n.title));
+  await a.register(); seen.notificationReceived({ notification: { title: "Hi" } });
+  assert.deepEqual(got, ["FCM-1", "Hi"]);
+  const b = messagingAdapter(M("", true)), errs = [];
+  await b.addListener("registrationError", e => errs.push(e.message)); await b.register();
+  assert.deepEqual(errs, ["no apns"]);
+  await a.unregister(); assert.equal(seen.deleted, true);
+});

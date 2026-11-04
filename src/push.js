@@ -1,4 +1,4 @@
-// Push notifications through Firebase Cloud Messaging (Android app only; the browser version has none).
+// Push notifications through Firebase Cloud Messaging (the phone apps only; the browser version has none).
 // createPush takes the two things that differ between the phone and a test: is this a native app, and how to load the plugin.
 import { Capacitor } from "@capacitor/core";
 
@@ -54,6 +54,27 @@ export function createPush({ isNative, loadPlugin, setTimer = setTimeout, clearT
   return { startPush, readPermission, stopPush };
 }
 
-const real = createPush({ isNative: () => Capacitor.isNativePlatform(), loadPlugin: async () => (await import("@capacitor/push-notifications")).PushNotifications });
+// Both phones use the Firebase Messaging plugin, so the token is always an FCM token (the server sends through FCM).
+// This adapter gives it the small interface createPush expects.
+export function messagingAdapter(M) {
+  const regListeners = [], errListeners = [];
+  return {
+    checkPermissions: () => M.checkPermissions(),
+    requestPermissions: () => M.requestPermissions(),
+    removeAllListeners: async () => { regListeners.length = 0; errListeners.length = 0; await M.removeAllListeners(); },
+    addListener: async (name, f) => {
+      if (name === "registration") regListeners.push(f);
+      else if (name === "registrationError") errListeners.push(f);
+      else if (name === "pushNotificationReceived") await M.addListener("notificationReceived", e => f((e && e.notification) || {}));
+    },
+    createChannel: o => M.createChannel(o),
+    register: async () => {
+      try { const r = await M.getToken(); regListeners.forEach(f => f({ value: r.token })); }
+      catch (e) { errListeners.forEach(f => f(e)); }
+    },
+    unregister: () => M.deleteToken()
+  };
+}
+const real = createPush({ isNative: () => Capacitor.isNativePlatform(), loadPlugin: async () => messagingAdapter((await import("@capacitor-firebase/messaging")).FirebaseMessaging) });
 export const pushSupported = () => Capacitor.isNativePlatform();
 export const { startPush, readPermission, stopPush } = real;

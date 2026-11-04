@@ -136,11 +136,12 @@ Google) сервер пишет в запись устройства, ошибк
 5. В Firebase: добавить iOS-приложение с тем же Bundle ID, скачать `GoogleService-Info.plist`; включить провайдер Apple в Authentication.
 6. Секреты репозитория: `APPLE_TEAM_ID`, `IOS_CERT_P12_B64`, `IOS_CERT_PASSWORD`, `IOS_PROFILE_B64`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `IOS_GOOGLE_SERVICE_INFO_B64` (файлы кодируются `base64 -i файл`).
 
-Не сделано и не проверено (сборка на Mac здесь не запускалась):
+Push и вход через Google на iOS сделаны в коде, но на Mac не запускались. Для них нужно:
 
-- **Push на iOS.** Сервер шлёт через FCM, а плагин на iOS отдаёт токен APNs. Нужны ключ APNs в Firebase и подключение Firebase Messaging в `AppDelegate`. Пока на iOS уведомления не придут.
-- Вход через Google на iOS: нужно добавить `REVERSED_CLIENT_ID` из `GoogleService-Info.plist` в URL Types (`Info.plist`).
-- Первая сборка на раннере может потребовать правок: я не мог её запустить до вашего первого запуска.
+- загрузить в Firebase (Project settings → Cloud Messaging → Apple app configuration) ключ APNs `.p8` (Key ID и Team ID);
+- положить `GoogleService-Info.plist` в секрет `IOS_GOOGLE_SERVICE_INFO_B64`: workflow сам допишет из него `REVERSED_CLIENT_ID` в `Info.plist`.
+
+Push на обоих телефонах идёт через плагин Firebase Messaging (токен всегда FCM). Первая сборка на раннере может потребовать правок.
 
 ## Иконка и логотип
 

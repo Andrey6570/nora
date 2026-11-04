@@ -23,6 +23,17 @@ jobs:
         env: { PLIST: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}" }
         run: |
           if [ -n "$PLIST" ]; then echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist; else echo "no GoogleService-Info.plist secret: Google/Apple sign-in will not work in this build"; fi
+      - name: Google sign-in URL scheme from GoogleService-Info.plist
+        run: |
+          P=ios/App/App/GoogleService-Info.plist
+          if [ -f "$P" ]; then
+            R=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' "$P")
+            I=ios/App/App/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$I" || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$I"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
+          else echo "no plist: Google sign-in URL scheme not added"; fi
       - run: |
           npx vite build
           npx cap sync ios
@@ -74,6 +85,17 @@ jobs:
           UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/nora.mobileprovision")")
           cp "$RUNNER_TEMP/nora.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
           echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+      - name: Google sign-in URL scheme from GoogleService-Info.plist
+        run: |
+          P=ios/App/App/GoogleService-Info.plist
+          if [ -f "$P" ]; then
+            R=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' "$P")
+            I=ios/App/App/Info.plist
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$I" || true
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$I"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
+            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
+          else echo "no plist: Google sign-in URL scheme not added"; fi
       - run: |
           npx vite build
           npx cap sync ios
