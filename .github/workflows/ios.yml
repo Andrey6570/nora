@@ -84,6 +84,10 @@ jobs:
       - run: |
           npx vite build
           npx cap sync ios
+      - name: Register a placeholder device (Apple wants one device before it creates the profile)
+        run: |
+          jq -n --arg k "$KID" --arg i "$ISS" --rawfile p "$ASC_KEY_PATH" '{key_id:$k, issuer_id:$i, key:$p, in_house:false}' > "$RUNNER_TEMP/asc.json"
+          fastlane run register_device name:"CI placeholder" udid:"00008101-000A1B2C3D4E5F60" api_key_path:"$RUNNER_TEMP/asc.json" team_id:"$TEAM" 2>&1 | tail -8 || true
       - name: Archive
         run: |
           set -o pipefail
