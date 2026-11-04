@@ -110,7 +110,7 @@ jobs:
           r = requests.get("https://api.appstoreconnect.apple.com/v1/certificates", headers=h, params={"limit": 200}); r.raise_for_status()
           for c in r.json()["data"]:
               a = c["attributes"]
-              mine = (a.get("name") or "").strip().lower() == "created via api" and a.get("certificateType") in ("DEVELOPMENT", "IOS_DEVELOPMENT")
+              mine = (a.get("name") or "").strip().lower().endswith(": created via api") and a.get("certificateType") in ("DEVELOPMENT", "IOS_DEVELOPMENT")
               print(a.get("certificateType"), a.get("name"), "->", "revoke" if mine else "keep")
               if mine:
                   requests.delete("https://api.appstoreconnect.apple.com/v1/certificates/" + c["id"], headers=h).raise_for_status()
