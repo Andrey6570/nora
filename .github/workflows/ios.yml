@@ -38,6 +38,11 @@ jobs:
             /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
             /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
           else echo "no plist: Google sign-in URL scheme not added"; fi
+      - name: Add GoogleService-Info.plist to the app bundle (a file in the folder is not enough, the project must list it)
+        run: |
+          [ -f ios/App/App/GoogleService-Info.plist ] || { echo "no plist, skipping"; exit 0; }
+          ruby -e 'require "xcodeproj"; pr = Xcodeproj::Project.open("ios/App/App.xcodeproj"); t = pr.targets.find { |x| x.name == "App" }; g = pr.main_group["App"]; ref = g.new_file("GoogleService-Info.plist"); t.resources_build_phase.add_file_reference(ref); pr.save'
+          grep -c "GoogleService-Info.plist" ios/App/App.xcodeproj/project.pbxproj
       - run: |
           npx vite build
           npx cap sync ios
@@ -86,6 +91,11 @@ jobs:
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$I"
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
           /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
+      - name: Add GoogleService-Info.plist to the app bundle (a file in the folder is not enough, the project must list it)
+        run: |
+          [ -f ios/App/App/GoogleService-Info.plist ] || { echo "no plist, skipping"; exit 0; }
+          ruby -e 'require "xcodeproj"; pr = Xcodeproj::Project.open("ios/App/App.xcodeproj"); t = pr.targets.find { |x| x.name == "App" }; g = pr.main_group["App"]; ref = g.new_file("GoogleService-Info.plist"); t.resources_build_phase.add_file_reference(ref); pr.save'
+          grep -c "GoogleService-Info.plist" ios/App/App.xcodeproj/project.pbxproj
       - run: |
           npx vite build
           npx cap sync ios
