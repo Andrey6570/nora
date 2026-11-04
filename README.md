@@ -131,10 +131,9 @@ Google) сервер пишет в запись устройства, ошибк
 
 1. Apple Developer Program (99 $/год) и Team ID.
 2. В developer.apple.com: App ID `com.andrey6570.nora` с включёнными Sign in with Apple и Push Notifications.
-3. Сертификат Apple Distribution (`.p12`) и provisioning profile App Store для этого App ID.
-4. В App Store Connect: запись приложения и API-ключ (Key ID, Issuer ID, файл `.p8`).
-5. В Firebase: добавить iOS-приложение с тем же Bundle ID, скачать `GoogleService-Info.plist`; включить провайдер Apple в Authentication.
-6. Секреты репозитория: `APPLE_TEAM_ID`, `IOS_CERT_P12_B64`, `IOS_CERT_PASSWORD`, `IOS_PROFILE_B64`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `IOS_GOOGLE_SERVICE_INFO_B64` (файлы кодируются `base64 -i файл`).
+3. В App Store Connect: запись приложения и API-ключ с ролью Admin или App Manager (Key ID, Issuer ID, файл `.p8`). Сертификат и профиль заводятся автоматически через этот ключ.
+4. В Firebase: добавить iOS-приложение с тем же Bundle ID, скачать `GoogleService-Info.plist`; включить провайдер Apple в Authentication.
+5. Секреты репозитория: `APPLE_TEAM_ID`, `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, `IOS_GOOGLE_SERVICE_INFO_B64` (файл кодируется `base64`).
 
 Push и вход через Google на iOS сделаны в коде, но на Mac не запускались. Для них нужно:
 

@@ -47,68 +47,47 @@ jobs:
         with: { name: Nora-ios-simulator, path: Nora-simulator.zip }
 
   testflight:
+    # Signing is automatic: the App Store Connect API key lets xcodebuild create the distribution certificate and profile in your Apple account.
     if: ${{ inputs.signed }}
     runs-on: macos-15
+    env:
+      TEAM: ${{ secrets.APPLE_TEAM_ID }}
+      KID: ${{ secrets.ASC_KEY_ID }}
+      ISS: ${{ secrets.ASC_ISSUER_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
       - run: npm ci
-      - name: Check the Apple secrets
+      - name: Check the secrets and write the key files
         env:
-          A: "${{ secrets.IOS_CERT_P12_B64 }}"
-          B: "${{ secrets.IOS_CERT_PASSWORD }}"
-          C: "${{ secrets.IOS_PROFILE_B64 }}"
-          D: "${{ secrets.ASC_KEY_ID }}"
-          E: "${{ secrets.ASC_ISSUER_ID }}"
-          F: "${{ secrets.ASC_KEY_P8 }}"
-          G: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}"
-          T: "${{ secrets.APPLE_TEAM_ID }}"
+          P8: ${{ secrets.ASC_KEY_P8 }}
+          PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}
         run: |
-          for v in A B C D E F G T; do [ -n "${!v}" ] || { echo "::error::a required Apple secret is missing (see README, iOS section)"; exit 1; }; done
-      - name: Install certificate and profile
-        env:
-          CERT: "${{ secrets.IOS_CERT_P12_B64 }}"
-          PASS: "${{ secrets.IOS_CERT_PASSWORD }}"
-          PROFILE: "${{ secrets.IOS_PROFILE_B64 }}"
-          PLIST: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}"
-        run: |
+          for v in TEAM KID ISS P8 PLIST; do [ -n "${!v}" ] || { echo "::error::secret for $v is missing (see README, iOS section)"; exit 1; }; done
           echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist
-          KC="$RUNNER_TEMP/build.keychain"
-          security create-keychain -p "ci" "$KC"; security set-keychain-settings -lut 21600 "$KC"
-          security unlock-keychain -p "ci" "$KC"; security list-keychains -d user -s "$KC" login.keychain
-          echo "$CERT" | base64 --decode > "$RUNNER_TEMP/cert.p12"
-          security import "$RUNNER_TEMP/cert.p12" -k "$KC" -P "$PASS" -T /usr/bin/codesign
-          security set-key-partition-list -S apple-tool:,apple: -s -k "ci" "$KC"
-          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
-          echo "$PROFILE" | base64 --decode > "$RUNNER_TEMP/nora.mobileprovision"
-          UUID=$(/usr/libexec/PlistBuddy -c 'Print UUID' /dev/stdin <<< "$(security cms -D -i "$RUNNER_TEMP/nora.mobileprovision")")
-          cp "$RUNNER_TEMP/nora.mobileprovision" ~/Library/MobileDevice/Provisioning\ Profiles/$UUID.mobileprovision
-          echo "PROFILE_UUID=$UUID" >> "$GITHUB_ENV"
+          echo "$P8" > "$RUNNER_TEMP/AuthKey.p8"
+          echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Google sign-in URL scheme from GoogleService-Info.plist
         run: |
-          P=ios/App/App/GoogleService-Info.plist
-          if [ -f "$P" ]; then
-            R=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' "$P")
-            I=ios/App/App/Info.plist
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$I" || true
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$I"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
-            /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
-          else echo "no plist: Google sign-in URL scheme not added"; fi
+          R=$(/usr/libexec/PlistBuddy -c 'Print :REVERSED_CLIENT_ID' ios/App/App/GoogleService-Info.plist)
+          I=ios/App/App/Info.plist
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes array" "$I" || true
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0 dict" "$I"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes array" "$I"
+          /usr/libexec/PlistBuddy -c "Add :CFBundleURLTypes:0:CFBundleURLSchemes:0 string $R" "$I"
       - run: |
           npx vite build
           npx cap sync ios
       - name: Archive
-        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}" }
         run: |
           xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Release \
             -destination 'generic/platform=iOS' -archivePath build/Nora.xcarchive \
             CURRENT_PROJECT_VERSION=${{ github.run_number }} \
-            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE="$PROFILE_UUID" archive | tail -30
+            DEVELOPMENT_TEAM="$TEAM" CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS" archive | tail -40
       - name: Export IPA
-        env: { TEAM: "${{ secrets.APPLE_TEAM_ID }}" }
         run: |
           cat > build/export.plist <<PL
           <?xml version="1.0" encoding="UTF-8"?>
@@ -116,19 +95,16 @@ jobs:
           <plist version="1.0"><dict>
             <key>method</key><string>app-store-connect</string>
             <key>teamID</key><string>$TEAM</string>
-            <key>signingStyle</key><string>manual</string>
-            <key>provisioningProfiles</key><dict><key>com.andrey6570.nora</key><string>$PROFILE_UUID</string></dict>
+            <key>signingStyle</key><string>automatic</string>
           </dict></plist>
           PL
-          xcodebuild -exportArchive -archivePath build/Nora.xcarchive -exportPath build/ipa -exportOptionsPlist build/export.plist
+          xcodebuild -exportArchive -archivePath build/Nora.xcarchive -exportPath build/ipa -exportOptionsPlist build/export.plist \
+            -allowProvisioningUpdates -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$KID" -authenticationKeyIssuerID "$ISS"
       - uses: actions/upload-artifact@v4
         with: { name: Nora-ios-ipa, path: build/ipa/*.ipa }
       - name: Upload to TestFlight
-        env:
-          KID: "${{ secrets.ASC_KEY_ID }}"
-          ISS: "${{ secrets.ASC_ISSUER_ID }}"
-          P8: "${{ secrets.ASC_KEY_P8 }}"
         run: |
           mkdir -p ~/.appstoreconnect/private_keys
-          echo "$P8" > ~/.appstoreconnect/private_keys/AuthKey_$KID.p8
+          cp "$ASC_KEY_PATH" ~/.appstoreconnect/private_keys/AuthKey_$KID.p8
           xcrun altool --upload-app --type ios --file build/ipa/*.ipa --apiKey "$KID" --apiIssuer "$ISS"
