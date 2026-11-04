@@ -99,6 +99,22 @@ jobs:
       - run: |
           npx vite build
           npx cap sync ios
+      - name: Remove old development certificates that earlier CI runs created (Apple allows only a few)
+        run: |
+          pip3 install --quiet pyjwt cryptography requests
+          python3 - <<'PY'
+          import os, time, jwt, requests
+          key = open(os.environ["ASC_KEY_PATH"]).read()
+          tok = jwt.encode({"iss": os.environ["ISS"], "exp": int(time.time()) + 600, "aud": "appstoreconnect-v1"}, key, algorithm="ES256", headers={"kid": os.environ["KID"]})
+          h = {"Authorization": "Bearer " + tok}
+          r = requests.get("https://api.appstoreconnect.apple.com/v1/certificates", headers=h, params={"limit": 200}); r.raise_for_status()
+          for c in r.json()["data"]:
+              a = c["attributes"]
+              mine = (a.get("name") or "").strip().lower() == "created via api" and a.get("certificateType") in ("DEVELOPMENT", "IOS_DEVELOPMENT")
+              print(a.get("certificateType"), a.get("name"), "->", "revoke" if mine else "keep")
+              if mine:
+                  requests.delete("https://api.appstoreconnect.apple.com/v1/certificates/" + c["id"], headers=h).raise_for_status()
+          PY
       - name: Register a placeholder device (Apple wants one device before it creates the profile)
         run: |
           jq -n --arg k "$KID" --arg i "$ISS" --rawfile p "$ASC_KEY_PATH" '{key_id:$k, issuer_id:$i, key:$p, in_house:false}' > "$RUNNER_TEMP/asc.json"
