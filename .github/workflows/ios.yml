@@ -22,7 +22,11 @@ jobs:
       - name: Firebase config for iOS (optional)
         env: { PLIST: "${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}" }
         run: |
-          if [ -n "$PLIST" ]; then echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist; else echo "no GoogleService-Info.plist secret: Google/Apple sign-in will not work in this build"; fi
+          if [ -n "$PLIST" ]; then
+            # the secret may hold the plist as base64 or pasted as plain text
+            if echo "$PLIST" | grep -q "<plist"; then echo "$PLIST" > ios/App/App/GoogleService-Info.plist; else echo "$PLIST" | tr -d ' \r\n' | base64 --decode > ios/App/App/GoogleService-Info.plist; fi
+            plutil -lint ios/App/App/GoogleService-Info.plist || { echo "::error::IOS_GOOGLE_SERVICE_INFO_B64 is not a valid GoogleService-Info.plist (neither base64 nor plain text)"; exit 1; }
+          else echo "no GoogleService-Info.plist secret: Google/Apple sign-in will not work in this build"; fi
       - name: Google sign-in URL scheme from GoogleService-Info.plist
         run: |
           P=ios/App/App/GoogleService-Info.plist
@@ -65,7 +69,8 @@ jobs:
           PLIST: ${{ secrets.IOS_GOOGLE_SERVICE_INFO_B64 }}
         run: |
           for v in TEAM KID ISS P8 PLIST; do [ -n "${!v}" ] || { echo "::error::secret for $v is missing (see README, iOS section)"; exit 1; }; done
-          echo "$PLIST" | base64 --decode > ios/App/App/GoogleService-Info.plist
+          if echo "$PLIST" | grep -q "<plist"; then echo "$PLIST" > ios/App/App/GoogleService-Info.plist; else echo "$PLIST" | tr -d ' \r\n' | base64 --decode > ios/App/App/GoogleService-Info.plist; fi
+          plutil -lint ios/App/App/GoogleService-Info.plist || { echo "::error::IOS_GOOGLE_SERVICE_INFO_B64 is not a valid GoogleService-Info.plist (neither base64 nor plain text)"; exit 1; }
           echo "$P8" > "$RUNNER_TEMP/AuthKey.p8"
           echo "ASC_KEY_PATH=$RUNNER_TEMP/AuthKey.p8" >> "$GITHUB_ENV"
       - name: Google sign-in URL scheme from GoogleService-Info.plist
