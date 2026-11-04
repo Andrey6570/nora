@@ -59,6 +59,11 @@ jobs:
       KID: ${{ secrets.ASC_KEY_ID }}
       ISS: ${{ secrets.ASC_ISSUER_ID }}
     steps:
+      - name: Select Xcode 26 (App Store Connect requires the iOS 26 SDK)
+        run: |
+          X=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$X" ] || { echo "::error::no Xcode 26 on this runner image"; ls /Applications | grep -i xcode; exit 1; }
+          sudo xcode-select -s "$X"; xcodebuild -version
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22, cache: npm }
