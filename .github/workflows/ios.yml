@@ -101,7 +101,7 @@ jobs:
           npx cap sync ios
       - name: Remove old development certificates that earlier CI runs created (Apple allows only a few)
         run: |
-          pip3 install --quiet pyjwt cryptography requests
+          pip3 install --quiet --break-system-packages pyjwt cryptography requests
           python3 - <<'PY'
           import os, time, jwt, requests
           key = open(os.environ["ASC_KEY_PATH"]).read()
