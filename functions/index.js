@@ -1,4 +1,4 @@
-// Server side of Nora: awards stars, delivers warm signals with push, cleans up a pair both partners have left.
+// Server side of Folia: awards stars, delivers warm signals with push, cleans up a pair both partners have left.
 import { initializeApp } from "firebase-admin/app";
 import { getFirestore } from "firebase-admin/firestore";
 import { getMessaging } from "firebase-admin/messaging";

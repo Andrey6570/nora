@@ -1,4 +1,4 @@
-// The logo of Nora: a little fox peeking out of its burrow (a mound) with a star above. One drawing in a 512 x 512 box,
+// The logo of Folia: a little fox peeking out of its burrow (a mound) with a star above. One drawing in a 512 x 512 box,
 // used by the app (inline SVG) and by tools/make-icons.mjs, which turns it into every icon and splash file.
 
 export const COLORS = {

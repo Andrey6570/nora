@@ -1,4 +1,4 @@
-# Nora branding
+# Folia branding
 
 The logo is a little fox peeking out of its burrow with a star above it: a game for two about home and caring for each other.
 It is drawn in code in `src/logo.js` and every file here and in `android/` and `public/` is built from that one drawing:

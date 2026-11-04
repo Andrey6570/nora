@@ -1,4 +1,4 @@
-/* Nora: Liquid Glass, the look of iOS 26 and 27.
+/* Folia: Liquid Glass, the look of iOS 26 and 27.
    Glass is for the navigation layer that floats above the content (tab bar, top bar, sheets, the add button, toasts);
    the content itself sits on solid grouped cards. Radii are concentric: outer 26, inner 12-16, controls are capsules. */
 :root {

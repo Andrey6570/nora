@@ -30,9 +30,9 @@ function splashSvg(w, h) {
 
 function featureSvg(lang) {
   const text = {
-    en: ["Nora", "A game for two about home and caring for each other"],
-    ru: ["Нора", "Игра для двоих о быте и заботе друг о друге"],
-    el: ["Νόρα", "Ένα παιχνίδι για δύο για το σπίτι και τη φροντίδα"]
+    en: ["Folia", "A game for two about home and caring for each other"],
+    ru: ["Folia", "Игра для двоих о быте и заботе друг о друге"],
+    el: ["Folia", "Ένα παιχνίδι για δύο για το σπίτι και τη φροντίδα"]
   }[lang];
   const mark = `<g transform="translate(40 40) scale(0.84)">${ART}</g>`;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 500" width="1024" height="500"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${COLORS.cream}"/><stop offset="1" stop-color="${COLORS.creamDark}"/></linearGradient></defs>
@@ -47,7 +47,7 @@ function lockupSvg(dark) {
   const ink = dark ? "#F3EAE2" : COLORS.ink;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 300" width="900" height="300"><rect width="900" height="300" fill="${dark ? "#1B1714" : "#FBF7F2"}"/>
     <g transform="translate(24 12) scale(0.54)">${ART}</g>
-    <text x="320" y="190" font-family="'Segoe UI', Roboto, 'Noto Sans', system-ui, sans-serif" font-size="130" font-weight="700" fill="${ink}">Nora</text></svg>`;
+    <text x="320" y="190" font-family="'Segoe UI', Roboto, 'Noto Sans', system-ui, sans-serif" font-size="130" font-weight="700" fill="${ink}">Folia</text></svg>`;
 }
 
 // the notification icon: a white fox head with its eyes and nose cut out, as an Android vector drawable
@@ -134,13 +134,13 @@ track(join(IOS, "*"), "icon 1024 + splash", "");
 
 // ---- branding for the stores and for people who write about the app ----
 const BR = join(ROOT, "branding");
-out(join(BR, "logo-mark.svg"), markSvg(512, "Nora"));
+out(join(BR, "logo-mark.svg"), markSvg(512, "Folia"));
 out(join(BR, "icon.svg"), iconSvg({ size: 512 }));
 await png(squareSvg(512, 0.88), join(BR, "play-icon-512.png"), 512);
 for (const lang of ["en", "ru", "el"]) await png(featureSvg(lang), join(BR, `feature-graphic-${lang}-1024x500.png`), 1024, 500);
 await png(lockupSvg(false), join(BR, "logo-lockup-light.png"), 900, 300);
 await png(lockupSvg(true), join(BR, "logo-lockup-dark.png"), 900, 300);
-out(join(BR, "README.md"), `# Nora branding
+out(join(BR, "README.md"), `# Folia branding
 
 The logo is a little fox peeking out of its burrow with a star above it: a game for two about home and caring for each other.
 It is drawn in code in \`src/logo.js\` and every file here and in \`android/\` and \`public/\` is built from that one drawing:

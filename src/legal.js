@@ -10,7 +10,7 @@ const DPA = `<a href="https://www.dataprotection.gov.cy" target="_blank" rel="no
 export const LEGAL = {
   privacy: {
     ru: { title: "Политика конфиденциальности", updated: "Действует с 28 октября 2026 г.", sections: [
-      ["Кто отвечает за данные", `Оператор данных приложения «Нора» — ${OWNER.ru}, ${ADDRESS.ru}. По любым вопросам о данных пишите на ${EMAIL}.`],
+      ["Кто отвечает за данные", `Оператор данных приложения «Folia» — ${OWNER.ru}, ${ADDRESS.ru}. По любым вопросам о данных пишите на ${EMAIL}.`],
       ["Какие данные мы обрабатываем", `<ul>
         <li><b>Учётная запись Google:</b> идентификатор, адрес почты и имя из профиля Google. Их хранит сервис входа Firebase Authentication.</li>
         <li><b>Имя в приложении,</b> которое вы указали сами.</li>
@@ -41,12 +41,12 @@ export const LEGAL = {
         <li>Технические журналы и резервные копии Google удаляются в сроки, установленные Google.</li>
       </ul>`],
       ["Ваши права", `По GDPR вы можете запросить доступ к своим данным и их копию, исправление, удаление, ограничение обработки, перенос данных, а также возразить против обработки и отозвать согласие. Удалить учётную запись можно в самом приложении; остальные запросы присылайте на ${EMAIL}. Мы отвечаем в течение одного месяца. Вы также вправе подать жалобу в надзорный орган: на Кипре это Уполномоченный по защите персональных данных (${DPA}), или в орган вашей страны в ЕС.`],
-      ["Возраст", "«Нора» предназначена только для людей старше 18 лет. Мы сознательно не обрабатываем данные несовершеннолетних."],
+      ["Возраст", "«Folia» предназначена только для людей старше 18 лет. Мы сознательно не обрабатываем данные несовершеннолетних."],
       ["Безопасность", "Доступ к данным пары есть только у двух её участников: это проверяют правила базы данных на сервере. Звёзды начисляет только сервер. Соединение с сервером шифруется."],
       ["Изменения политики", "Если политика изменится по существу, мы покажем это в приложении и при необходимости попросим согласие заново. Действующая версия всегда доступна в «Настройках»."]
     ] },
     en: { title: "Privacy policy", updated: "Effective from 28 October 2026", sections: [
-      ["Who is responsible for your data", `The data controller for the Nora app is ${OWNER.en}, ${ADDRESS.en}. For any question about your data, write to ${EMAIL}.`],
+      ["Who is responsible for your data", `The data controller for the Folia app is ${OWNER.en}, ${ADDRESS.en}. For any question about your data, write to ${EMAIL}.`],
       ["What data we process", `<ul>
         <li><b>Google account:</b> identifier, email address and name from your Google profile, stored by the Firebase Authentication sign-in service.</li>
         <li><b>Your name in the app,</b> which you enter yourself.</li>
@@ -77,12 +77,12 @@ export const LEGAL = {
         <li>Technical logs and Google's backups are deleted within the periods set by Google.</li>
       </ul>`],
       ["Your rights", `Under the GDPR you may request access to your data and a copy of it, rectification, erasure, restriction of processing and data portability, object to processing and withdraw consent. You can delete your account in the app itself; send other requests to ${EMAIL}. We reply within one month. You also have the right to lodge a complaint with a supervisory authority: in Cyprus, the Commissioner for Personal Data Protection (${DPA}), or the authority of your EU country.`],
-      ["Age", "Nora is intended only for people aged 18 and over. We do not knowingly process data of minors."],
+      ["Age", "Folia is intended only for people aged 18 and over. We do not knowingly process data of minors."],
       ["Security", "Only the two members of a pair can access its data; database rules on the server enforce this. Only the server awards stars. The connection to the server is encrypted."],
       ["Changes to this policy", "If this policy changes materially, we will show it in the app and ask for consent again where required. The current version is always available in Settings."]
     ] },
     el: { title: "Πολιτική απορρήτου", updated: "Ισχύει από 28 Οκτωβρίου 2026", sections: [
-      ["Υπεύθυνος επεξεργασίας", `Υπεύθυνος επεξεργασίας για την εφαρμογή Νόρα είναι ${OWNER.el}, ${ADDRESS.el}. Για οποιαδήποτε ερώτηση σχετικά με τα δεδομένα σας, γράψτε στο ${EMAIL}.`],
+      ["Υπεύθυνος επεξεργασίας", `Υπεύθυνος επεξεργασίας για την εφαρμογή Folia είναι ${OWNER.el}, ${ADDRESS.el}. Για οποιαδήποτε ερώτηση σχετικά με τα δεδομένα σας, γράψτε στο ${EMAIL}.`],
       ["Ποια δεδομένα επεξεργαζόμαστε", `<ul>
         <li><b>Λογαριασμός Google:</b> αναγνωριστικό, διεύθυνση email και όνομα από το προφίλ Google, που αποθηκεύονται από την υπηρεσία σύνδεσης Firebase Authentication.</li>
         <li><b>Το όνομά σας στην εφαρμογή,</b> το οποίο εισάγετε εσείς.</li>
@@ -113,14 +113,14 @@ export const LEGAL = {
         <li>Τα τεχνικά αρχεία καταγραφής και τα αντίγραφα ασφαλείας της Google διαγράφονται εντός των προθεσμιών που ορίζει η Google.</li>
       </ul>`],
       ["Τα δικαιώματά σας", `Σύμφωνα με τον ΓΚΠΔ μπορείτε να ζητήσετε πρόσβαση στα δεδομένα σας και αντίγραφό τους, διόρθωση, διαγραφή, περιορισμό της επεξεργασίας και φορητότητα, να αντιταχθείτε στην επεξεργασία και να ανακαλέσετε τη συναίνεσή σας. Μπορείτε να διαγράψετε τον λογαριασμό σας μέσα από την εφαρμογή· τα υπόλοιπα αιτήματα στείλτε στο ${EMAIL}. Απαντούμε εντός ενός μηνός. Έχετε επίσης δικαίωμα να υποβάλετε καταγγελία σε εποπτική αρχή: στην Κύπρο, στον Επίτροπο Προστασίας Δεδομένων Προσωπικού Χαρακτήρα (${DPA}), ή στην αρχή της χώρας σας στην ΕΕ.`],
-      ["Ηλικία", "Η Νόρα προορίζεται μόνο για άτομα άνω των 18 ετών. Δεν επεξεργαζόμαστε εν γνώσει μας δεδομένα ανηλίκων."],
+      ["Ηλικία", "Η Folia προορίζεται μόνο για άτομα άνω των 18 ετών. Δεν επεξεργαζόμαστε εν γνώσει μας δεδομένα ανηλίκων."],
       ["Ασφάλεια", "Πρόσβαση στα δεδομένα ενός ζευγαριού έχουν μόνο τα δύο μέλη του· αυτό το επιβάλλουν οι κανόνες της βάσης δεδομένων στον διακομιστή. Τα αστέρια απονέμονται μόνο από τον διακομιστή. Η σύνδεση με τον διακομιστή είναι κρυπτογραφημένη."],
       ["Αλλαγές στην πολιτική", "Αν η πολιτική αλλάξει ουσιωδώς, θα το εμφανίσουμε στην εφαρμογή και, όπου απαιτείται, θα ζητήσουμε ξανά συναίνεση. Η ισχύουσα έκδοση είναι πάντα διαθέσιμη στις Ρυθμίσεις."]
     ] }
   },
   terms: {
     ru: { title: "Условия использования", updated: "Действуют с 28 октября 2026 г.", sections: [
-      ["О сервисе", `«Нора» — бесплатное приложение для пар, в котором двое отмечают домашние дела и получают виртуальные звёзды. Сервис предоставляет ${OWNER.ru}, ${ADDRESS.ru} (${EMAIL}).`],
+      ["О сервисе", `«Folia» — бесплатное приложение для пар, в котором двое отмечают домашние дела и получают виртуальные звёзды. Сервис предоставляет ${OWNER.ru}, ${ADDRESS.ru} (${EMAIL}).`],
       ["Кто может пользоваться", "Только люди старше 18 лет. Входя в приложение, вы подтверждаете свой возраст и принимаете эти условия и политику конфиденциальности."],
       ["Учётная запись и пара", "Вы входите через свою учётную запись Google и отвечаете за её безопасность. В паре может быть два человека. Код приглашения передавайте только тому, с кем хотите играть: по нему можно присоединиться к вашей паре, пока в ней есть свободное место."],
       ["Ваши материалы", "Вы отвечаете за то, что вводите в приложение: имя и названия дел. Не вводите чужие персональные данные, оскорбления и незаконное содержимое. Ваш партнёр видит то, что вы вводите."],
@@ -132,7 +132,7 @@ export const LEGAL = {
       ["Изменения", "Если условия изменятся по существу, мы сообщим об этом в приложении. Продолжая пользоваться приложением после изменения, вы принимаете новые условия."]
     ] },
     en: { title: "Terms of use", updated: "Effective from 28 October 2026", sections: [
-      ["About the service", `Nora is a free app for couples in which two people mark household chores and earn virtual stars. The service is provided by ${OWNER.en}, ${ADDRESS.en} (${EMAIL}).`],
+      ["About the service", `Folia is a free app for couples in which two people mark household chores and earn virtual stars. The service is provided by ${OWNER.en}, ${ADDRESS.en} (${EMAIL}).`],
       ["Who may use it", "Only people aged 18 and over. By signing in you confirm your age and accept these terms and the privacy policy."],
       ["Account and pair", "You sign in with your Google account and are responsible for keeping it secure. A pair can have two people. Share the invite code only with the person you want to play with: anyone with it can join your pair while there is a free place."],
       ["Your content", "You are responsible for what you enter in the app: your name and chore titles. Do not enter other people's personal data, insults or unlawful content. Your partner sees what you enter."],
@@ -144,7 +144,7 @@ export const LEGAL = {
       ["Changes", "If these terms change materially, we will tell you in the app. By continuing to use the app after a change, you accept the new terms."]
     ] },
     el: { title: "Όροι χρήσης", updated: "Ισχύουν από 28 Οκτωβρίου 2026", sections: [
-      ["Σχετικά με την υπηρεσία", `Η Νόρα είναι μια δωρεάν εφαρμογή για ζευγάρια, στην οποία δύο άτομα σημειώνουν δουλειές του σπιτιού και κερδίζουν εικονικά αστέρια. Την υπηρεσία παρέχει ${OWNER.el}, ${ADDRESS.el} (${EMAIL}).`],
+      ["Σχετικά με την υπηρεσία", `Η Folia είναι μια δωρεάν εφαρμογή για ζευγάρια, στην οποία δύο άτομα σημειώνουν δουλειές του σπιτιού και κερδίζουν εικονικά αστέρια. Την υπηρεσία παρέχει ${OWNER.el}, ${ADDRESS.el} (${EMAIL}).`],
       ["Ποιος μπορεί να τη χρησιμοποιεί", "Μόνο άτομα άνω των 18 ετών. Με τη σύνδεση επιβεβαιώνετε την ηλικία σας και αποδέχεστε αυτούς τους όρους και την πολιτική απορρήτου."],
       ["Λογαριασμός και ζευγάρι", "Συνδέεστε με τον λογαριασμό σας Google και είστε υπεύθυνοι για την ασφάλειά του. Ένα ζευγάρι μπορεί να έχει δύο άτομα. Δώστε τον κωδικό πρόσκλησης μόνο στο άτομο με το οποίο θέλετε να παίξετε: όποιος τον έχει μπορεί να μπει στο ζευγάρι σας όσο υπάρχει ελεύθερη θέση."],
       ["Το περιεχόμενό σας", "Είστε υπεύθυνοι για ό,τι εισάγετε στην εφαρμογή: το όνομά σας και τους τίτλους των δουλειών. Μην εισάγετε προσωπικά δεδομένα άλλων, προσβολές ή παράνομο περιεχόμενο. Το ταίρι σας βλέπει ό,τι εισάγετε."],

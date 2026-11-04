@@ -22,7 +22,7 @@ const seg = (name, items, cur) => `<div class="seg" role="radiogroup">${items.ma
 const langChips = () => seg("lang", LANGS.map(([v, l]) => [v, l]), getLang());
 
 export function setup() {
-  return `<main class="center narrow"><div class="logo">${markSvg(104)}</div><h1>${t("Нора")}</h1>
+  return `<main class="center narrow"><div class="logo">${markSvg(104)}</div><h1>Folia</h1>
     <p class="lead">${t("Сервер ещё не подключён, поэтому войти пока нельзя. Демо показывает все экраны на примерных данных, ничего не сохраняется.")}</p>
     <button class="btn primary big" data-act="demo">${t("Посмотреть демо")}</button>
     <div class="foot">${langChips()}</div></main>`;
@@ -33,7 +33,7 @@ export function loading() { return `<main class="center"><div class="logo pulse"
 export function signIn(ui) {
   return `<main class="center">
     <div class="logo">${markSvg(104)}</div>
-    <h1>${t("Нора")}</h1>
+    <h1>Folia</h1>
     <p class="lead">${t("Дом — общее дело. Игра для двоих о быте и заботе друг о друге.")}</p>
     <button class="btn primary big" data-act="signin" ${ui.busy ? "disabled" : ""}>${t("Войти через Google")}</button>
     ${isIOS() ? `<button class="btn big apple" data-act="signin-apple" ${ui.busy ? "disabled" : ""}> ${t("Войти через Apple")}</button>` : ""}
@@ -66,7 +66,7 @@ export function welcome(ui) {
       <button class="btn primary big" data-act="create" ${ui.busy ? "disabled" : ""}>${t("Создать пару")}</button>
       <button class="btn ghost" data-act="welcome" data-v="choose">${t("Назад")}</button>`;
   } else {
-    body = `<p class="lead">${t("Нора — для двоих. Создайте пару и пригласите партнёра или введите код, который партнёр вам прислал.")}</p>
+    body = `<p class="lead">${t("Folia — для двоих. Создайте пару и пригласите партнёра или введите код, который партнёр вам прислал.")}</p>
       <button class="btn primary big" data-act="welcome" data-v="create">${t("Создать пару")}</button>
       <button class="btn big" data-act="welcome" data-v="join">${t("У меня есть код")}</button>
       <button class="btn ghost" data-act="signout">${t("Выйти из аккаунта")}</button>`;
@@ -77,7 +77,7 @@ export function welcome(ui) {
 function invite(pair) {
   return `<section class="card invite">
     <h2>${t("Пригласите партнёра")}</h2>
-    <p class="muted">${t("Партнёр устанавливает Нору, входит и вводит этот код:")}</p>
+    <p class="muted">${t("Партнёр устанавливает Folia, входит и вводит этот код:")}</p>
     <div class="code">${esc(pair.inviteCode || "")}</div>
     <div class="row"><button class="btn" data-act="copy-code">${t("Скопировать")}</button>
     <button class="btn primary" data-act="share-code">${t("Отправить")}</button></div>
@@ -269,14 +269,14 @@ function pushCard(S) {
   else if (pushOk(P)) line = "✅ " + t("Уведомления включены на этом телефоне");
   else if (st === "ready") { line = t("Токен получен, но не сохранён: {x}", { x: esc(P.saveError || "?") }); btn = "push-enable"; }
   else if (["checking", "asking", "registering"].includes(st)) line = "⏳ " + t("Идёт настройка…");
-  else if (st === "denied") { line = "❌ " + t("Разрешение отклонено. Откройте «Настройки» телефона → «Приложения» → «Нора» → «Уведомления», включите их и вернитесь сюда."); btn = "push-enable"; }
+  else if (st === "denied") { line = "❌ " + t("Разрешение отклонено. Откройте «Настройки» телефона → «Приложения» → «Folia» → «Уведомления», включите их и вернитесь сюда."); btn = "push-enable"; }
   else if (st === "error") { line = "⚠️ " + t("Не получилось включить: {x}", { x: esc(P.error || "?") }); btn = "push-enable"; }
   else { line = t("Разрешение ещё не запрошено. Нажмите кнопку, и телефон спросит."); btn = "push-enable"; }
   const result = last ? `<p class="muted small">${t("Последняя отправка сервера")}: ${last.ok ? "✅ " + t("доставлено в Google") : "❌ " + esc(last.code || "?")}</p>` : "";
   return `<section class="card"><h2>${t("Уведомления")}</h2><p class="${pushOk(P) ? "" : "muted"}">${line}</p>
     ${btn ? `<button class="btn primary" data-act="${btn}">${st === "denied" || st === "error" || st === "ready" ? t("Проверить снова") : t("Включить уведомления")}</button>` : ""}
     ${pushOk(P) ? `<button class="btn" data-act="push-test">${t("Отправить тестовое уведомление")}</button>
-      <p class="muted small">${t("Придёт на этот телефон. Если не пришло, отключите для «Нора» экономию заряда: Настройки → Приложения → Нора → Батарея.")}</p>` : ""}
+      <p class="muted small">${t("Придёт на этот телефон. Если не пришло, отключите для «Folia» экономию заряда: Настройки → Приложения → Folia → Батарея.")}</p>` : ""}
     ${result}</section>`;
 }
 function pushBanner(S) {
@@ -348,7 +348,7 @@ function settingsTab(S, ui) {
     <section class="card"><h2>${t("Аккаунт и данные")}</h2>
       <p class="muted">${t("Удаляет ваш профиль, имя в паре и запись входа. Партнёр останется в паре.")}</p>
       <button class="btn danger" data-act="delete-account">${t("Удалить аккаунт")}</button></section>
-    <p class="muted center-text small">${t("Нора")} 0.1</p>`;
+    <p class="muted center-text small">Folia 0.1</p>`;
 }
 
 const TABS = [["tasks", "📋", "Дела"], ["us", "🦊", "Мы"], ["warm", "💌", "Тепло"], ["games", "🎲", "Игры"], ["settings", "⚙️", "Настройки"]];
@@ -359,7 +359,7 @@ export function main(S, ui) {
   if (ui.game) return gameScreen(S, ui) + (ui.sheet ? sheet(S, ui) : "");
   const body = ui.tab === "us" ? usTab(S, ui) : ui.tab === "warm" ? warmthTab(S) : ui.tab === "games" ? ((S.pair.members || []).length < 2 ? invite(S.pair) : "") + gamesTab(S) : ui.tab === "settings" ? settingsTab(S, ui) : tasksTab(S);
   const unseen = ui.tab === "warm" ? 0 : unseenSignals(S.signals || [], S.user.uid, ui.seenAt || 0);
-  return `<header class="top"><span class="brand">${markSvg(30)}<b>${t("Нора")}</b></span><span class="nav-title">${t(TAB_TITLE(ui.tab))}</span>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
+  return `<header class="top"><span class="brand">${markSvg(30)}<b>Folia</b></span><span class="nav-title">${t(TAB_TITLE(ui.tab))}</span>${S.demo ? `<span class="badge">${t("Демо")}</span>` : ""}</header>
     <main class="page"><h1 class="large-title">${t(TAB_TITLE(ui.tab))}</h1>${body}${err(ui)}</main>
     <nav class="tabs">${TABS.map(([id, icon, label]) =>
       `<button class="${ui.tab === id ? "on" : ""}" data-act="tab" data-v="${id}" aria-current="${ui.tab === id}"><span>${icon}${id === "warm" && unseen ? `<i class="dot" aria-label="${unseen}">${unseen}</i>` : ""}</span>${t(label)}</button>`).join("")}</nav>

@@ -475,7 +475,7 @@ test("a test request sends one notification to that phone in its language and re
   const dev = { uid: "b", token: "T1", lang: "el", at: 1 };
   const db = fakeDb({ "pairs/p": sigPair, "pairs/p/devices/d1": { ...dev, test: 5 } }), messaging = fakeMessaging();
   assert.equal(await onDeviceUpdated({ db, messaging }, { pid: "p", id: "d1", before: dev, after: { ...dev, test: 5 } }), "sent");
-  assert.deepEqual(messaging.sent.map(m => [m.tokens, m.notification.title, m.notification.body]), [[["T1"], "Νόρα", "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊"]]);
+  assert.deepEqual(messaging.sent.map(m => [m.tokens, m.notification.title, m.notification.body]), [[["T1"], "Folia", "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊"]]);
   assert.equal(db.docs.get("pairs/p/devices/d1").lastResult.ok, true);
   // writing the result back (test unchanged), a missing token or no request: nothing is sent
   const same = { ...dev, test: 5 };

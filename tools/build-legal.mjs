@@ -14,7 +14,7 @@ mark{background:#FFE58A;padding:0 2px;border-radius:3px}
 
 const page = (lang, title, body) => `<!doctype html>
 <html lang="${lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${title} · Nora</title><link rel="icon" type="image/svg+xml" href="../icon.svg"><style>${css}</style></head><body><main>${body}</main></body></html>
+<title>${title} · Folia</title><link rel="icon" type="image/svg+xml" href="../icon.svg"><style>${css}</style></head><body><main>${body}</main></body></html>
 `;
 
 mkdirSync(OUT, { recursive: true });
@@ -29,5 +29,5 @@ for (const kind of Object.keys(LEGAL)) {
     links.push(`<li><a href="${kind}-${lang}.html">${d.title}</a> (${LANG_NAMES[lang]})</li>`);
   }
 }
-writeFileSync(OUT + "index.html", page("en", "Nora", `<h1>Nora</h1><ul>${links.join("")}</ul>`));
+writeFileSync(OUT + "index.html", page("en", "Folia", `<h1>Folia</h1><ul>${links.join("")}</ul>`));
 console.log("legal pages written to hosting/legal/");

@@ -59,6 +59,6 @@ jobs:
           cp "$APK" nora.apk
           gh release delete latest --yes --cleanup-tag || true
           gh release create latest nora.apk \
-            --title "Нора, сборка №${GITHUB_RUN_NUMBER}" \
+            --title "Folia, сборка №${GITHUB_RUN_NUMBER}" \
             --notes "Сборка из коммита ${GITHUB_SHA::7}. Скачайте nora.apk на телефон и установите." \
             --target "$GITHUB_SHA"

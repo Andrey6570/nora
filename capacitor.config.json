@@ -1,6 +1,6 @@
 {
   "appId": "com.andrey6570.nora",
-  "appName": "Nora",
+  "appName": "Folia",
   "webDir": "dist",
   "plugins": {
     "FirebaseAuthentication": {

@@ -64,7 +64,7 @@ test("web icons, store images and the favicon links are in place", () => {
 });
 
 test("the drawing: one source, valid SVG strings, the brand colours", () => {
-  assert.match(markSvg(64, "Nora"), /^<svg [^>]*width="64"[^>]*role="img" aria-label="Nora"/);
+  assert.match(markSvg(64, "Folia"), /^<svg [^>]*width="64"[^>]*role="img" aria-label="Folia"/);
   assert.match(markSvg(64), /aria-hidden="true"/);
   assert.ok(iconSvg({}).includes("linearGradient") && !iconSvg({ background: false }).includes("linearGradient"));
   assert.ok(ART.includes(COLORS.orange) && ART.includes(COLORS.star));

@@ -51,7 +51,7 @@ export const shopText = (kind, lang, title, cost) => SHOP[kind][lang](title.leng
 
 // The test notification sent from Settings, to see that the whole chain works
 export const TEST_PUSH = {
-  ru: { title: "Нора", body: "Проверка уведомлений: всё работает! 🦊" },
-  en: { title: "Nora", body: "Notification check: it works! 🦊" },
-  el: { title: "Νόρα", body: "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊" }
+  ru: { title: "Folia", body: "Проверка уведомлений: всё работает! 🦊" },
+  en: { title: "Folia", body: "Notification check: it works! 🦊" },
+  el: { title: "Folia", body: "Έλεγχος ειδοποιήσεων: λειτουργεί! 🦊" }
 };

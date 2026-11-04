@@ -31,7 +31,7 @@ export function createPush({ isNative, loadPlugin, setTimer = setTimeout, clearT
       await P.addListener("registration", t => { clearTimer(timer); set("ready"); if (onToken) onToken(t.value); });
       await P.addListener("registrationError", e => { clearTimer(timer); set("error", text(e)); });
       await P.addListener("pushNotificationReceived", n => { if (onMessage) onMessage({ title: n.title || "", body: n.body || "" }); });
-      try { await P.createChannel({ id: "default", name: "Nora", importance: 4, visibility: 1 }); } catch (e) {}
+      try { await P.createChannel({ id: "default", name: "Folia", importance: 4, visibility: 1 }); } catch (e) {}
       set("registering");
       // if Google never answers (no Play services, no network), say so instead of waiting for ever
       timer = setTimer(() => set("error", "no answer from Google within " + TOKEN_WAIT_MS / 1000 + " s"), TOKEN_WAIT_MS);

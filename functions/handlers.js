@@ -81,7 +81,7 @@ export async function onSignalCreated(deps, { pid, id, data }) {
   let taskTitle = "";
   const parsed = data.kind === "reaction" && data.ref ? parseLogId(data.ref) : null;
   if (parsed) { const t = await db.doc(`pairs/${pid}/tasks/${parsed.taskId}`).get(); taskTitle = t.exists ? t.data().title : ""; }
-  await pushTo(deps, pid, res.partner, res.name || "Nora", lang => pushText(data.kind, data.key, lang, taskTitle));
+  await pushTo(deps, pid, res.partner, res.name || "Folia", lang => pushText(data.kind, data.key, lang, taskTitle));
   return "sent";
 }
 
@@ -166,7 +166,7 @@ export async function onOrderCreated(deps, { pid, id, data }) {
   });
   if (res.reason) return res.reason;
   if (res.done) return "bought";
-  await pushTo(deps, pid, res.partner, res.name || "Nora", lang => shopText(res.kind, lang, orderName(res.named, res.ref, res.title, lang), res.cost));
+  await pushTo(deps, pid, res.partner, res.name || "Folia", lang => shopText(res.kind, lang, orderName(res.named, res.ref, res.title, lang), res.cost));
   return res.kind === "personal" ? "bought" : "proposed";
 }
 
@@ -187,7 +187,7 @@ export async function onOrderUpdated(deps, { pid, id, before, after }) {
     return { buyer: o.uid, approver: o.approvedBy, title: o.title, named: o.kind === "reward" ? "" : o.kind, ref: o.ref, names: p.names || {} };
   });
   if (res.reason) return res.reason;
-  await pushTo(deps, pid, res.buyer, res.names[res.approver] || "Nora", lang => shopText("approved", lang, orderName(res.named, res.ref, res.title, lang)));
+  await pushTo(deps, pid, res.buyer, res.names[res.approver] || "Folia", lang => shopText("approved", lang, orderName(res.named, res.ref, res.title, lang)));
   return "bought";
 }
 

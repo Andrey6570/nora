@@ -151,7 +151,7 @@ const actions = {
     try { await navigator.clipboard.writeText(S.pair.inviteCode); toast(t("Код скопирован")); } catch (e) { toast(S.pair.inviteCode); }
   },
   "share-code": async () => {
-    const text = t("Давай играть в Нору вдвоём! Установи приложение и введи код: {code}", { code: S.pair.inviteCode });
+    const text = t("Давай играть в Folia вдвоём! Установи приложение и введи код: {code}", { code: S.pair.inviteCode });
     try { if (navigator.share) await navigator.share({ text }); else { await navigator.clipboard.writeText(text); toast(t("Текст приглашения скопирован")); } } catch (e) {}
   },
   "new-invite": () => run(() => store.newInvite(), "Новый код готов"),
